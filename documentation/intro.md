@@ -9,22 +9,22 @@
 
 ### B. Problem Decomposition
 
-- Vấn đề nhận thức dữ liệu (Data Understanding):
-      - Tự động profile schema: tên cột, kiểu dữ liệu, sample data, mô tả ý nghĩa (description).
-      - Tự động phát hiện quan hệ (Relationship Inference): Dựa trên mẫu dữ liệu (tên cột, kiểu dữ liệu, thống kê, few-shot, etc) để dự đoán đâu là Primary Key (PK), Foreign Key (FK) nếu không có metadata rõ ràng.
+- **Vấn đề nhận thức dữ liệu (Data Understanding):**
+  - Tự động profile schema: tên cột, kiểu dữ liệu, sample data, mô tả ý nghĩa (description).
+  - Tự động phát hiện quan hệ (Relationship Inference): Dựa trên mẫu dữ liệu (tên cột, kiểu dữ liệu, thống kê, few-shot, etc) để dự đoán đâu là Primary Key (PK), Foreign Key (FK) nếu không có metadata rõ ràng.
 
-- Vấn đề suy luận và lập kế hoạch (Reasoning & Planning):
-      - Phân tích ý định người dùng (intent).
-      - Mapping ý định đó sang các thực thể dữ liệu cụ thể (chọn bảng, cột).
-      - Lập kế hoạch các bước truy vấn: Đơn bảng hay cần join? Lọc dữ liệu ra sao?
+- **Vấn đề suy luận và lập kế hoạch (Reasoning & Planning):**
+  - Phân tích ý định người dùng (intent).
+  - Mapping ý định đó sang các thực thể dữ liệu cụ thể (chọn bảng, cột).
+  - Lập kế hoạch các bước truy vấn: Đơn bảng hay cần join? Lọc dữ liệu ra sao?
 
-- Vấn đề thực thi (Execution):
-      - Sinh code Python (Pandas) an toàn, chính xác.
-      - Cơ chế tự sửa lỗi (Self-Healing) khi code lỗi (sai tên cột, sai syntax).
+- **Vấn đề thực thi (Execution):**
+  - Sinh code Python (Pandas) an toàn, chính xác.
+  - Cơ chế tự sửa lỗi (Self-Healing) khi code lỗi (sai tên cột, sai syntax).
 
-- Vấn đề trực quan hóa (Interaction & Visualization):
-      - Chuyển đổi kết quả DataFrame thành câu trả lời ngôn ngữ tự nhiên.
-      - Kích hoạt sinh biểu đồ (Matplotlib) thông qua code.
+- **Vấn đề trực quan hóa (Interaction & Visualization):**
+  - Chuyển đổi kết quả DataFrame thành câu trả lời ngôn ngữ tự nhiên.
+  - Kích hoạt sinh biểu đồ (Matplotlib) thông qua code.
 
 ## 2. System design
 
@@ -42,8 +42,7 @@ graph TD
       end
 
       subgraph Row["Client"]
-            direction LR
-            A[User Prompt] --> B
+            A[User Prompt]
             M[Output]
       end
 
@@ -60,6 +59,7 @@ graph TD
             J -- Image Plot --> L
       end
 
+      A --> B
       E --> H
       F --> H
       L -- Final answer presentation --> M
