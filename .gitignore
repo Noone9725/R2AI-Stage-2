@@ -1,0 +1,33 @@
+# ── bi mat ───────────────────────────────────────────────────
+.env
+*.key
+*.pem
+
+# ── Python ───────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# ── du lieu (nang, BTC cung cap — khong day len git) ─────────
+data
+
+# ── ket qua chay ─────────────────────────────────────────────
+logs/
+
+# ── he thong ─────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.claude/
+.analysis/

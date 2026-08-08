@@ -1,0 +1,41 @@
+bm25:
+  k1: 1.5
+  b: 0.75
+  tokenizer: vn_simple           # bo dau + lowercase + split non-alnum
+
+embedding:
+  model_id: BAAI/bge-m3          # multilingual, ho tro tieng Viet
+  device: cuda
+  batch_size: 32
+  normalize: true
+  max_length: 512
+
+vectordb:
+  backend: faiss                 # faiss | chroma
+  metric: ip                     # inner product (voi vector da normalize == cosine)
+  index_type: IndexFlatIP
+
+hybrid:
+  fusion: rrf                    # rrf | weighted_sum
+  rrf_k: 60
+  weight_bm25: 0.5
+  weight_dense: 0.5
+  candidate_top_k: 100           # truoc khi rerank
+
+rerank:
+  enabled: true
+  model_id: BAAI/bge-reranker-v2-m3
+  top_k: 20
+
+selector:
+  # F2 uu tien recall gap 4 lan precision -> chon rong tay hon truc giac
+  strategy: adaptive             # fixed | adaptive
+  min_tables: 1
+  max_tables: 5
+  score_ratio_threshold: 0.55    # giu bang co score >= ratio * score_cao_nhat
+
+hard_filters:
+  # Loc cung truoc khi rank: sai ticker/nam thi khong the la bang lien quan
+  by_ticker: true
+  by_year: true
+  year_tolerance: 1              # BCTC nam N thuong chua so lieu nam N-1

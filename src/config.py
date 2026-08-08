@@ -1,0 +1,94 @@
+"""Load configs/*.yaml + .env thanh mot object Settings duy nhat.
+
+Moi module khac chi import `get_settings()`, khong tu doc YAML.
+"""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass, field
+from functools import lru_cache
+from pathlib import Path
+from typing import Any
+
+import yaml
+from dotenv import load_dotenv
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+CONFIG_DIR = PROJECT_ROOT / "configs"
+
+
+def _read_yaml(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        raise FileNotFoundError(f"Thieu file config: {path}")
+    with path.open("r", encoding="utf-8") as f:
+        return yaml.safe_load(f) or {}
+
+
+@dataclass(frozen=True)
+class Paths:
+    raw: Path
+    interim: Path
+    processed: Path
+    index: Path
+    questions: Path
+    outputs: Path
+    labels: Path
+
+    def ensure(self) -> None:
+        for p in (self.raw, self.interim, self.processed, self.index,
+                  self.questions, self.outputs, self.labels):
+            p.mkdir(parents=True, exist_ok=True)
+
+
+@dataclass(frozen=True)
+class Settings:
+    root: Path
+    paths: Paths
+    corpus: dict[str, Any]
+    llm: dict[str, Any]
+    execution: dict[str, Any]
+    submission: dict[str, Any]
+    logging: dict[str, Any]
+    retrieval: dict[str, Any] = field(default_factory=dict)
+
+    # Secrets tu .env — khong bao gio de trong YAML
+    hf_token: str | None = None
+    llm_api_key: str | None = None
+
+    def raw_value(self, dotted: str, default: Any = None) -> Any:
+        """Truy cap sau, vd: settings.raw_value("retrieval.bm25.k1")."""
+        node: Any = {
+            "corpus": self.corpus, "llm": self.llm, "execution": self.execution,
+            "submission": self.submission, "logging": self.logging,
+            "retrieval": self.retrieval,
+        }
+        for key in dotted.split("."):
+            if not isinstance(node, dict) or key not in node:
+                return default
+            node = node[key]
+        return node
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    load_dotenv(PROJECT_ROOT / ".env")
+
+    main = _read_yaml(CONFIG_DIR / "config.yaml")
+    retrieval = _read_yaml(CONFIG_DIR / "retrieval.yaml")
+
+    raw_paths = main.get("paths", {})
+    paths = Paths(**{k: PROJECT_ROOT / v for k, v in raw_paths.items()})
+
+    return Settings(
+        root=PROJECT_ROOT,
+        paths=paths,
+        corpus=main.get("corpus", {}),
+        llm=main.get("llm", {}),
+        execution=main.get("execution", {}),
+        submission=main.get("submission", {}),
+        logging=main.get("logging", {}),
+        retrieval=retrieval,
+        hf_token=os.getenv("HF_TOKEN"),
+        llm_api_key=os.getenv("LLM_API_KEY"),
+    )
