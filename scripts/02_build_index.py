@@ -21,13 +21,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Build BM25 + dense index")
     parser.add_argument("--skip-dense", action="store_true",
                         help="Chi build BM25, bo qua embedding")
+    parser.add_argument("--rebuild-manifest", action="store_true",
+                        help="Tu dong scan va tao lai manifest.jsonl tu data/processed/")
     parser.add_argument("--device", default=None, help="cpu | cuda")
     parser.add_argument("--batch-size", type=int, default=None)
     args = parser.parse_args()
 
     bootstrap()
     embedder = Embedder(device=args.device, batch_size=args.batch_size)
-    stats = IndexPipeline(embedder=embedder).run(skip_dense=args.skip_dense)
+    stats = IndexPipeline(embedder=embedder).run(
+        skip_dense=args.skip_dense,
+        force_manifest_rebuild=args.rebuild_manifest,
+    )
 
     print("\n=== Stage 1b ===")
     for key, value in stats.items():

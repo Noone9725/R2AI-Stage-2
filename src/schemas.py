@@ -110,6 +110,8 @@ class Question:
     asked_unit: str = "none"
     # Thoi diem cau hoi yeu cau: closing | opening | annual | "" (khong ro).
     requested_period: str = ""
+    # Loai BCTC: "consolidated" (hop nhat) | "separate" (cong ty me/rieng le) | None
+    report_type: str | None = None
 
 
 @dataclass(slots=True)
@@ -213,3 +215,18 @@ class SubmissionItem:
             "evidence": [e.to_dict() for e in self.evidence],
             "pandas_query": self.pandas_query,
         }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "SubmissionItem":
+        return cls(
+            id=int(d["id"]),
+            question=str(d.get("question", "")),
+            answer=float(d.get("answer", 0.0)),
+            relevant_docs=list(d.get("relevant_docs", [])),
+            relevant_tables=list(d.get("relevant_tables", [])),
+            evidence=[
+                Evidence(variable=str(e.get("variable", "")), csv_path=str(e.get("csv_path", "")))
+                for e in d.get("evidence", [])
+            ],
+            pandas_query=str(d.get("pandas_query", "")),
+        )

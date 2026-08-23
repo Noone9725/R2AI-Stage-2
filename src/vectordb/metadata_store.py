@@ -19,7 +19,7 @@ from ..utils.logging import get_logger
 log = get_logger(__name__)
 
 _YEAR_RE = re.compile(r"(?:19|20)\d{2}")
-_TICKER_RE = re.compile(r"^([A-Z]{3,4})_")
+_TICKER_RE = re.compile(r"^([A-Z0-9]{3,5})_")
 
 
 @dataclass(slots=True)
@@ -48,16 +48,87 @@ class MetadataStore:
 
     # ── load ──────────────────────────────────────────────
 
+    def rebuild_manifest_from_processed(self, processed_dir: str | Path | None = None) -> int:
+        """Tu dong scan toan bo CSVs trong data/processed de build lai manifest.jsonl."""
+        settings = get_settings()
+        p_dir = Path(processed_dir) if processed_dir else settings.paths.processed
+        if not p_dir.exists():
+            raise FileNotFoundError(f"Khong tim thay thu muc processed: {p_dir}")
+
+        csv_files = sorted(p_dir.glob("*.csv"))
+        if not csv_files:
+            raise FileNotFoundError(f"Thu muc {p_dir} khong co file CSV nao! Hay chay stage 1 corpus truoc.")
+
+        log.info("Dang quet %d file CSV trong %s de tao manifest.jsonl...", len(csv_files), p_dir)
+        rows: list[dict] = []
+        pattern = re.compile(r"^(.*)_table_(\d+)\.csv$")
+
+        for f in csv_files:
+            m = pattern.match(f.name)
+            if not m:
+                continue
+            doc_id = m.group(1)
+            pos = int(m.group(2))
+            table_ref = f"{doc_id}|{pos}"
+            ticker = self._infer_ticker(doc_id)
+            year = self._infer_year(doc_id)
+            report_type = self._infer_report_type(doc_id)
+            csv_rel = f"data/{f.name}"
+
+            # Doc nhanh schema va danh sach chi tieu cua file CSV
+            items: list[str] = []
+            cols: list[str] = []
+            try:
+                df_sample = pd.read_csv(f, nrows=30)
+                cols = list(df_sample.columns)
+                if "item" in df_sample.columns:
+                    items = [
+                        str(x).strip()
+                        for x in df_sample["item"].dropna().unique()
+                        if str(x).strip() and len(str(x).strip()) > 2
+                    ][:15]
+            except Exception:
+                pass
+
+            # Tao the card co ban giau tin hieu tim kiem
+            items_desc = f". Chi tiêu: {', '.join(items)}" if items else ""
+            card = f"Bang so {pos} trong BCTC {ticker or ''} nam {year or ''} ({report_type or ''}){items_desc}. Cot: {', '.join(cols[:8])}"
+
+            rows.append({
+                "table_ref": table_ref,
+                "doc_id": doc_id,
+                "position": pos,
+                "csv_path": csv_rel,
+                "filename": f.name,
+                "title": "",
+                "section": None,
+                "unit": "vnd",
+                "ticker": ticker,
+                "year": year,
+                "report_type": report_type,
+                "card": card,
+                "columns": cols,
+                "n_rows": 0,
+            })
+
+        from ..utils.io import write_jsonl_atomic
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        n = write_jsonl_atomic(rows, self.path)
+        log.info("Da tao thanh cong manifest.jsonl voi %d bang -> %s", n, self.path)
+        return n
+
     def load(self) -> "MetadataStore":
-        if not self.path.exists():
-            raise FileNotFoundError(
-                f"Chua co manifest: {self.path}. Chay scripts/01_build_corpus.py truoc."
-            )
+        if not self.path.exists() or self.path.stat().st_size == 0:
+            log.info("Chua co manifest.jsonl -> Tu dong khoi tao tu data/processed/...")
+            self.rebuild_manifest_from_processed()
 
         rows = list(read_jsonl(self.path))
         for row in rows:
-            row.setdefault("ticker", self._infer_ticker(row["doc_id"]))
-            row.setdefault("year", self._infer_year(row["doc_id"]))
+            # Luon tinh toan chinh xac ticker va report_type tu doc_id
+            doc_id = str(row.get("doc_id", ""))
+            row["ticker"] = self._infer_ticker(doc_id) or row.get("ticker")
+            row["year"] = self._infer_year(doc_id) or row.get("year")
+            row["report_type"] = self._infer_report_type(doc_id)
 
         self._df = pd.DataFrame(rows)
         if "year" in self._df.columns:
@@ -90,8 +161,7 @@ class MetadataStore:
     def df(self) -> pd.DataFrame:
         if self._df is None:
             self.load()
-        assert self._df is not None
-        return self._df
+        return self._df  # type: ignore[return-value]
 
     def get(self, table_ref: str) -> TableMeta | None:
         if not self._by_ref:
@@ -117,6 +187,7 @@ class MetadataStore:
         years: list[int] | None = None,
         year_tolerance: int = 1,
         sections: list[str] | None = None,
+        report_types: list[str] | None = None,
     ) -> set[str] | None:
         """Tap table_ref thoa dieu kien. None = khong loc gi.
 
@@ -137,6 +208,11 @@ class MetadataStore:
             for y in years:
                 allowed.update(range(y, y + year_tolerance + 1))
             mask &= df["year"].isin(allowed)
+            applied = True
+
+        if report_types and "report_type" in df.columns:
+            lower = {r.lower() for r in report_types}
+            mask &= df["report_type"].astype(str).str.lower().isin(lower)
             applied = True
 
         if sections and "section" in df.columns:
@@ -160,3 +236,10 @@ class MetadataStore:
     def _infer_year(doc_id: str) -> int | None:
         found = _YEAR_RE.findall(doc_id)
         return int(found[-1]) if found else None
+
+    @staticmethod
+    def _infer_report_type(doc_id: str) -> str:
+        low = doc_id.lower()
+        if "separate" in low or "rieng" in low or "_me" in low or "cong_ty_me" in low or "parent" in low:
+            return "separate"
+        return "consolidated"

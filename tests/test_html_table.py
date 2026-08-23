@@ -164,3 +164,21 @@ def test_bang_ngan_hang_dung_ten_bao_cao_tinh_hinh_tai_chinh():
         "<tr><td>Tiền mặt</td><td>1.234.567.890</td></tr></table>\n"
     )
     assert TableDetector().detect(_doc(text))[0].section == "balance_sheet"
+
+
+def test_stitch_fractured_tables_across_pages():
+    text = (
+        "===== PAGE 8 =====\n"
+        "<table><tr><td>Chỉ tiêu</td><td>Năm 2023</td><td>Năm 2022</td></tr>\n"
+        "<tr><td>Doanh thu bán hàng</td><td>100.000</td><td>90.000</td></tr></table>\n"
+        "===== PAGE 9 =====\n"
+        "<table><tr><td>Giá vốn hàng bán</td><td>(60.000)</td><td>(50.000)</td></tr>\n"
+        "<tr><td>Lợi nhuận gộp</td><td>40.000</td><td>40.000</td></tr></table>\n"
+    )
+    tables = extract_html_tables(text, stitch=True)
+    assert len(tables) == 1
+    assert len(tables[0].rows) == 4
+    assert tables[0].rows[1][0] == "Doanh thu bán hàng"
+    assert tables[0].rows[2][0] == "Giá vốn hàng bán"
+    assert tables[0].position == 1
+

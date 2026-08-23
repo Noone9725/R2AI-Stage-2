@@ -21,9 +21,17 @@ class IndexPipeline:
         self.metadata = MetadataStore()
         self.embedder = embedder or Embedder()
 
-    def run(self, skip_dense: bool = False) -> dict[str, int]:
-        # Kiem tra corpus TRUOC khi ton cong embed: index xay tren mot manifest
-        # thieu 99% corpus van "thanh cong" ma khong ai biet.
+    def run(
+        self,
+        skip_dense: bool = False,
+        force_manifest_rebuild: bool = False,
+        **kwargs: Any,
+    ) -> dict[str, int]:
+        # 1. Dam bao manifest.jsonl duoc build / cap nhat tu data/processed
+        if force_manifest_rebuild or not self.metadata.path.exists() or self.metadata.path.stat().st_size == 0:
+            log.info("Khoi tao/cap nhat manifest.jsonl tu data/processed/...")
+            self.metadata.rebuild_manifest_from_processed()
+
         pre = check_corpus()
         if not pre.ok:
             raise CorpusIntegrityError(pre.render())
@@ -47,7 +55,8 @@ class IndexPipeline:
 
         n_vectors = 0
         if not skip_dense:
-            vectors = self.embedder.encode(texts, is_query=False)
+            log.info("Dang tao Dense Vectors cho %d bang (show_progress=True)...", len(texts))
+            vectors = self.embedder.encode(texts, show_progress=True, is_query=False)
             store = VectorStore().build(ids, vectors)
             store.save()
             n_vectors = len(store)

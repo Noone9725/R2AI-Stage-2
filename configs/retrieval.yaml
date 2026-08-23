@@ -6,7 +6,7 @@ bm25:
 embedding:
   model_id: BAAI/bge-m3          # multilingual, ho tro tieng Viet
   device: cuda
-  batch_size: 32
+  batch_size: 64
   normalize: true
   max_length: 512
 
@@ -20,19 +20,19 @@ hybrid:
   rrf_k: 60
   weight_bm25: 0.5
   weight_dense: 0.5
-  candidate_top_k: 100           # truoc khi rerank
+  candidate_top_k: 120           # truoc khi rerank
 
 rerank:
-  enabled: true
+  enabled: false
   model_id: BAAI/bge-reranker-v2-m3
-  top_k: 20
+  top_k: 30
 
 selector:
   # F2 uu tien recall gap 4 lan precision -> chon rong tay hon truc giac
-  strategy: adaptive             # fixed | adaptive
-  min_tables: 1
-  max_tables: 5
-  score_ratio_threshold: 0.55    # giu bang co score >= ratio * score_cao_nhat
+  strategy: adaptive             # fixed | adaptive | topk
+  min_tables: 2
+  max_tables: 16
+  score_ratio_threshold: 0.35    # giu bang co score >= ratio * score_cao_nhat
 
 hard_filters:
   # Loc cung truoc khi rank: sai ticker/nam thi khong the la bang lien quan

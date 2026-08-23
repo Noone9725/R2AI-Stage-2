@@ -83,25 +83,28 @@ def fetch_corpus(root: Path, token: str | None, tickers: list[str] | None) -> No
     print(f"[fetch] done — {n} file .txt trong {dest}")
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--questions-only", action="store_true")
-    ap.add_argument("--tickers", help="danh sach ma CK, phan cach dau phay")
-    args = ap.parse_args()
-
+def run_fetch(questions_only: bool = False, tickers: list[str] | None = None) -> None:
     root = bootstrap().root
-
     token = _token()
     print(f"[fetch] HF_TOKEN: {'co' if token else 'khong co (repo public van tai duoc)'}")
 
     fetch_small(root, token)
-    if not args.questions_only:
-        tickers = (
-            [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
-            if args.tickers
-            else None
-        )
+    if not questions_only:
         fetch_corpus(root, token, tickers)
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--questions-only", action="store_true")
+    ap.add_argument("--tickers", help="danh sach ma CK, phan cach dau phay")
+    args = ap.parse_args(argv)
+
+    tickers = (
+        [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
+        if args.tickers
+        else None
+    )
+    run_fetch(questions_only=args.questions_only, tickers=tickers)
     return 0
 
 

@@ -1,9 +1,9 @@
-Code pandas dưới đây bị lỗi. Hãy sửa lại.
+Code pandas dưới đây bị lỗi trong quá trình thực thi. Hãy sửa lại.
 
 CÂU HỎI:
 {question}
 
-CÁC BIẾN DATAFRAME:
+CÁC BIẾN DATAFRAME CÓ SẴN (ĐÃ NẠP TRONG BỘ NHỚ):
 {variables}
 
 LƯỢC ĐỒ VÀ MẪU DỮ LIỆU:
@@ -20,4 +20,13 @@ THÔNG BÁO LỖI:
 GỢI Ý CHẨN ĐOÁN:
 {hints}
 
-Yêu cầu: viết lại toàn bộ code đã sửa, vẫn gán kết quả số vào biến `result`, chỉ xuất một block ```python duy nhất, không giải thích.
+QUY TẮC BẮT BUỘC:
+1. TUYỆT ĐỐI KHÔNG giải thích, KHÔNG viết bất kỳ câu chữ tiếng Việt nào ("Để sửa lỗi...", "Đề xuất...").
+2. BẮT BUỘC chỉ xuất DUY NHẤT một block mã Python:
+```python
+...code đã sửa...
+```
+3. Luôn gán kết quả cuối cùng vào biến `result = float(sub['value'].iloc[0]) if not sub.empty else 0.0`.
+4. Lọc chỉ tiêu BẮT BUỘC dùng `.str.contains('từ khóa ngắn', case=False, na=False)`.
+5. TUYỆT ĐỐI KHÔNG viết `import pandas`, KHÔNG gọi `pd.read_csv()`. Dùng trực tiếp `df1`, `df2`...
+6. TUYỆT ĐỐI KHÔNG tự ý chia / 1e6 hay / 1e9 đổi đơn vị. Lấy giá trị số thô nguyên bản từ `df['value']`.

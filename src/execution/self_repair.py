@@ -43,20 +43,57 @@ class SelfRepairExecutor:
     ) -> tuple[ExecutionResult, GeneratedQuery]:
         code = query.pandas_query
         variables = pt.format_variables(query.var_to_csv)
-        schemas = pt.format_schemas(frames)
+        schemas = pt.format_schemas(frames, question_text=question_text)
         last: ExecutionResult | None = None
 
+        if not code or not code.strip():
+            log.info("LLM chua sinh duoc code hop le o buoc dau -> Khoi dong Self-Repair tao ma...")
+            # Tao prompt ban dau de yeu cau viet code
+            hints = "Chưa có code hợp lệ. Hãy viết code pandas gán kết quả vào biến `result`."
+            prompt = pt.render(
+                "self_repair",
+                question=question_text,
+                variables=variables,
+                schemas=schemas,
+                code="# Chưa có code",
+                error="No valid code generated initially",
+                hints=hints,
+            )
+            try:
+                response = self.llm.generate(prompt, system=pt.SYSTEM_PANDAS)
+                code = extract_code(response)
+                if not code:
+                    from .sandbox import _clean_code_lines
+                    code = _clean_code_lines(response)
+            except Exception as exc:  # noqa: BLE001
+                log.info("LLM loi khi sinh code khoi tao: %s", exc)
+                code = ""
+
+        if not code:
+            log.info("Khong the khoi tao ma code hop le tu LLM -> Dung fallback 0.0")
+            res = ExecutionResult(success=False, value=0.0, raw_value=0.0, error="No valid code generated", attempt=0)
+            query.pandas_query = ""
+            return res, query
+
         for attempt in range(1, self.max_attempts + 1):
+            log.info("--- [Luot %d/%d] Chay ma Pandas: ---", attempt, self.max_attempts)
+            for line in code.strip().splitlines():
+                log.info("  | %s", line)
+
             result = self.sandbox.run(code, frames, attempt=attempt)
             if result.success:
-                if attempt > 1:
-                    log.info("Sua thanh cong sau %d luot", attempt)
+                if attempt == 1:
+                    log.info("==> [Thanh cong L1] -> result=%s", result.value)
+                else:
+                    log.info("==> [Sua Thanh cong L%d] -> result=%s", attempt, result.value)
                 query.pandas_query = code
                 query.attempt = attempt
                 return result, query
 
             last = result
-            log.debug("Luot %d that bai: %s", attempt, result.error)
+            hint_text = diagnose(result, frames)
+            log.info("==> [L%d That bai] Loi: %s (%s)", attempt, result.error, result.error_type)
+            log.info("    Chan doan: %s", hint_text.replace("\n", " | "))
 
             if attempt == self.max_attempts:
                 break
@@ -68,21 +105,25 @@ class SelfRepairExecutor:
                 schemas=schemas,
                 code=code,
                 error=result.error,
-                hints=diagnose(result, frames),
+                hints=hint_text,
             )
             try:
                 response = self.llm.generate(prompt, system=pt.SYSTEM_PANDAS)
             except Exception as exc:  # noqa: BLE001
-                log.warning("LLM loi khi sua code: %s", exc)
+                log.info("LLM loi khi sua code o luot %d: %s", attempt, exc)
                 break
 
             new_code = extract_code(response)
-            if not new_code or new_code == code:
-                log.debug("LLM khong dua ra code moi — dung sua")
-                break
+            if not new_code:
+                from .sandbox import _clean_code_lines
+                new_code = _clean_code_lines(response)
+            if not new_code:
+                log.info("LLM khong sinh duoc ma code moi o luot %d", attempt)
+                continue
             code = new_code
 
         assert last is not None
+        log.info("==> Ket thuc %d luot: THAT BAI (%s) -> Bao toan ma sinh duoc va gan fallback 0.0", self.max_attempts, last.error)
         query.pandas_query = code
         query.attempt = last.attempt
         return last, query

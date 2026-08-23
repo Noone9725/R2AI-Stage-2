@@ -55,7 +55,7 @@ FINANCIAL_TERMS: dict[str, tuple[str, ...]] = {
         "von chu so huu", "tong von chu so huu", "nguon von chu so huu",
         "equity", "shareholders equity",
     ),
-    "charter_capital": ("von dieu le", "von gop cua chu so huu", "charter capital"),
+    "charter_capital": ("von dieu le", "von gop cua chu so huu", "von dau tu cua chu so huu", "charter capital"),
     "retained_earnings": ("loi nhuan sau thue chua phan phoi", "retained earnings"),
     # ── Cash flow ──
     "cf_operating": (
@@ -69,6 +69,35 @@ FINANCIAL_TERMS: dict[str, tuple[str, ...]] = {
         "luu chuyen tien thuan tu hoat dong tai chinh", "financing cash flow",
     ),
     "depreciation": ("khau hao", "khau hao tai san co dinh", "depreciation"),
+    # ── Ngan hang (Banking) ──
+    "net_interest_income": (
+        "thu nhap lai thuan", "thu nhap lai va cac khoan thu nhap tuong tu thuan", "lai thuan", "net interest income",
+    ),
+    "customer_loans": (
+        "cho vay khach hang", "du no cho vay", "du no cho vay khach hang", "loans to customers", "so du cho vay khach hang",
+    ),
+    "customer_deposits": ("tien gui cua khach hang", "tien gui khach hang", "deposits from customers"),
+    "provision_expense": (
+        "chi phi du phong", "chi phi du phong rui ro tin dung", "du phong rui ro", "credit provision expense",
+    ),
+    # ── Chung khoan & Dau tu (Securities) ──
+    "fvtpl": ("fvtpl", "tai san tai chinh ghi nhan thong qua lai lo", "lai tu fvtpl", "lo tu fvtpl"),
+    "htm": ("htm", "dau tu nam giu den ngay dao han", "held to maturity"),
+    "afs": ("afs", "tai san tai chinh san sang de ban", "available for sale"),
+    "brokerage_revenue": ("doanh thu nghiep vu moi gioi", "doanh thu moi gioi chung khoan", "doanh thu moi gioi"),
+    # ── Bat dong san & Xay dung (Real Estate) ──
+    "unearned_revenue": (
+        "nguoi mua tra tien truoc", "nguoi mua tra tien truoc ngan han", "doanh thu chua thuc hien", "unearned revenue",
+    ),
+    "construction_in_progress": ("chi phi xay dung co ban do dang", "xay dung do dang", "construction in progress"),
+    "investment_properties": ("bat dong san dau tu", "investment properties"),
+    # ── Thuyet minh chi tiet (Notes & Details) ──
+    "deposit_interest_income": ("lai tien gui", "lai tien gui ngan hang", "thu lai tien gui", "interest on deposits"),
+    "penalty_expense": ("chi phi phat", "tien phat", "tien phat vi pham", "chi phi phat thue", "tien phat cham nop"),
+    "staff_expense": ("chi phi nhan vien", "chi phi luong", "luong va cac khoan theo luong", "staff costs"),
+    "tangible_fixed_assets": ("tai san co dinh huu hinh", "tscd huu hinh", "tangible fixed assets"),
+    "fixed_assets_cost": ("nguyen gia", "nguyen gia tai san co dinh", "historical cost"),
+    "accumulated_depreciation": ("gia tri hao mon luy ke", "hao mon luy ke", "accumulated depreciation"),
 }
 
 # Chi so dan xuat — khong co san trong bang, phai TINH
@@ -89,16 +118,28 @@ DERIVED_METRICS: dict[str, tuple[str, ...]] = {
 
 # Cong thuc tinh — nhung vao prompt sinh pandas de LLM khong tu bia
 DERIVED_FORMULAS: dict[str, str] = {
-    "roe": "profit_after_tax / equity",
-    "roa": "profit_after_tax / total_assets",
-    "ros": "profit_after_tax / net_revenue",
+    "roe": "profit_after_tax / equity * 100.0",
+    "roa": "profit_after_tax / total_assets * 100.0",
+    "ros": "profit_after_tax / net_revenue * 100.0",
     "debt_to_equity": "total_liabilities / equity",
     "current_ratio": "current_assets / current_liabilities",
     "quick_ratio": "(current_assets - inventory) / current_liabilities",
-    "gross_margin": "gross_profit / net_revenue",
-    "net_margin": "profit_after_tax / net_revenue",
-    "growth": "(value_year_n - value_year_n_minus_1) / abs(value_year_n_minus_1)",
-    "cagr": "(value_end / value_start) ** (1 / n_years) - 1",
+    "gross_margin": "gross_profit / net_revenue * 100.0",
+    "net_margin": "profit_after_tax / net_revenue * 100.0",
+    "growth": "(value_year_n - value_year_n_minus_1) / abs(value_year_n_minus_1) * 100.0",
+    "cagr": "((value_end / value_start) ** (1 / n_years) - 1) * 100.0",
+}
+
+# Cac thanh phan nguyen tu cua chi tieu phai sinh de mo rong Schema Linking
+DERIVED_SUB_TERMS: dict[str, list[str]] = {
+    "roe": ["lợi nhuận sau thuế", "vốn chủ sở hữu"],
+    "roa": ["lợi nhuận sau thuế", "tổng tài sản"],
+    "ros": ["lợi nhuận sau thuế", "doanh thu thuần"],
+    "gross_margin": ["lợi nhuận gộp", "doanh thu thuần"],
+    "net_margin": ["lợi nhuận sau thuế", "doanh thu thuần"],
+    "debt_to_equity": ["nợ phải trả", "vốn chủ sở hữu"],
+    "current_ratio": ["tài sản ngắn hạn", "nợ ngắn hạn"],
+    "quick_ratio": ["tài sản ngắn hạn", "hàng tồn kho", "nợ ngắn hạn"],
 }
 
 

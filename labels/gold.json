@@ -1,0 +1,552 @@
+[
+  {
+    "id": 1,
+    "question": "Lãi tiền gửi năm 2018 của công ty mẹ CTCP Hàng không Vietjet (VJC) là bao nhiêu triệu đồng?",
+    "answer": 208253.2,
+    "relevant_docs": [
+      "VJC_financial_statements_2018_separate"
+    ],
+    "relevant_tables": [
+      "VJC_financial_statements_2018_separate|50"
+    ]
+  },
+  {
+    "id": 2,
+    "question": "Số dư cho vay khách hàng ngành Thương mại của công ty mẹ Ngân hàng TMCP Á Châu (ACB) cuối năm 2022 là bao nhiêu triệu đồng?",
+    "answer": 72.92,
+    "relevant_docs": [
+      "ACB_financial_statements_2022_separate"
+    ],
+    "relevant_tables": [
+      "ACB_financial_statements_2022_separate|35"
+    ]
+  },
+  {
+    "id": 4,
+    "question": "Lợi nhuận sau thuế của CTCP Chứng khoán FPT năm 2023 là bao nhiêu tỷ đồng?",
+    "answer": 0.0,
+    "relevant_docs": [
+      "FTS_financial_statements_2023"
+    ],
+    "relevant_tables": [
+      "FTS_financial_statements_2023|1"
+    ]
+  },
+  {
+    "id": 5,
+    "question": "Chi phí phạt của công ty mẹ SCR năm 2017 là bao nhiêu tỷ đồng?",
+    "answer": 5.54,
+    "relevant_docs": [
+      "SCR_financial_statements_2017_separate"
+    ],
+    "relevant_tables": [
+      "SCR_financial_statements_2017_separate|59"
+    ]
+  },
+  {
+    "id": 6,
+    "question": "Lưu chuyển tiền thuần từ hoạt động kinh doanh của công ty mẹ VSC trong năm 2017 là bao nhiêu tỷ đồng?",
+    "answer": 145.73,
+    "relevant_docs": [
+      "VSC_financial_statements_2018_separate"
+    ],
+    "relevant_tables": [
+      "VSC_financial_statements_2018_separate|9"
+    ]
+  },
+  {
+    "id": 9,
+    "question": "Chi phí khác của SAM năm 2023 là bao nhiêu triệu đồng?",
+    "answer": 2307.76,
+    "relevant_docs": [
+      "SAM_financial_statements_2023_consolidated"
+    ],
+    "relevant_tables": [
+      "SAM_financial_statements_2023_consolidated|57"
+    ]
+  },
+  {
+    "id": 11,
+    "question": "Số dư tiền gửi tại các TCTD khác cuối năm 2016 của Ngân hàng TMCP Đầu tư và Phát triển Việt Nam (BID) là bao nhiêu triệu đồng?",
+    "answer": 23.55,
+    "relevant_docs": [
+      "BID_financial_statements_2016_separate"
+    ],
+    "relevant_tables": [
+      "BID_financial_statements_2016_separate|75"
+    ]
+  },
+  {
+    "id": 12,
+    "question": "Vốn cổ phần đã phát hành của công ty mẹ VGT là bao nhiêu nghìn tỷ đồng vào cuối năm 2024?",
+    "answer": 5000.0,
+    "relevant_docs": [
+      "VGT_financial_statements_2025_separate"
+    ],
+    "relevant_tables": [
+      "VGT_financial_statements_2025_separate|9"
+    ]
+  },
+  {
+    "id": 14,
+    "question": "Chi phí quản lý doanh nghiệp năm 2025 của công ty mẹ ASM là bao nhiêu triệu đồng?",
+    "answer": 1322.23,
+    "relevant_docs": [
+      "ASM_financial_statements_2025_separate"
+    ],
+    "relevant_tables": [
+      "ASM_financial_statements_2025_separate|66"
+    ]
+  },
+  {
+    "id": 16,
+    "question": "Số dư vay ngắn hạn của công ty mẹ CEO cuối năm 2025 là bao nhiêu tỷ đồng?",
+    "answer": 3.31,
+    "relevant_docs": [
+      "CEO_financial_statements_2025_separate"
+    ],
+    "relevant_tables": [
+      "CEO_financial_statements_2025_separate|33"
+    ]
+  },
+  {
+    "id": 18,
+    "question": "Vốn chủ sở hữu của FIT là bao nhiêu tỷ đồng vào ngày 31/12/2015?",
+    "answer": 1992.04,
+    "relevant_docs": [
+      "FIT_financial_statements_2015_separate"
+    ],
+    "relevant_tables": [
+      "FIT_financial_statements_2015_separate|32"
+    ]
+  },
+  {
+    "id": 27,
+    "question": "Lưu chuyển tiền thuần từ hoạt động kinh doanh của công ty mẹ CTCP Tập đoàn Đức Long Gia Lai (DLG) năm 2024 là bao nhiêu triệu đồng?",
+    "answer": -150202.63,
+    "relevant_docs": [
+      "DLG_financial_statements_2024_separate"
+    ],
+    "relevant_tables": [
+      "DLG_financial_statements_2024_separate|9"
+    ]
+  },
+  {
+    "id": 29,
+    "question": "Tổng số trả trước cho người bán dài hạn của OGC đến ngày 31 tháng 12 năm 2019 là bao nhiêu triệu đồng?",
+    "answer": 528016.08,
+    "relevant_docs": [
+      "OGC_financial_statements_2019_consolidated"
+    ],
+    "relevant_tables": [
+      "OGC_financial_statements_2019_consolidated|72"
+    ]
+  },
+  {
+    "id": 32,
+    "question": "Số dư phải thu theo tiến độ kế hoạch hợp đồng của FPT đến ngày 31/12/2025 là bao nhiêu tỷ đồng?",
+    "answer": 200.41,
+    "relevant_docs": [
+      "FPT_financial_statements_2025_consolidated"
+    ],
+    "relevant_tables": [
+      "FPT_financial_statements_2025_consolidated|5"
+    ]
+  },
+  {
+    "id": 39,
+    "question": "Số dư phải thu phí quản lý tập trung của công ty mẹ Tập đoàn Công nghiệp Cao su Việt Nam - CTCP cuối năm 2020 là bao nhiêu triệu đồng?",
+    "answer": 36871.72,
+    "relevant_docs": [
+      "GVR_financial_statements_2020_separate"
+    ],
+    "relevant_tables": [
+      "GVR_financial_statements_2020_separate|74"
+    ]
+  },
+  {
+    "id": 40,
+    "question": "Lợi nhuận sau thuế của VIB năm 2020 là bao nhiêu triệu đồng?",
+    "answer": 4.64,
+    "relevant_docs": [
+      "VIB_financial_statements_2021_separate"
+    ],
+    "relevant_tables": [
+      "VIB_financial_statements_2021_separate|14"
+    ]
+  },
+  {
+    "id": 41,
+    "question": "Giá gốc chứng khoán kinh doanh của CTCP Tập đoàn Đức Long Gia Lai cuối năm 2016 là bao nhiêu tỷ đồng?",
+    "answer": 264.0,
+    "relevant_docs": [
+      "DLG_financial_statements_2016_consolidated"
+    ],
+    "relevant_tables": [
+      "DLG_financial_statements_2016_consolidated|12"
+    ]
+  },
+  {
+    "id": 45,
+    "question": "Tổng nợ phải trả của công ty mẹ BAB đến ngày 31/12/2020 là bao nhiêu triệu đồng?",
+    "answer": 0.14,
+    "relevant_docs": [
+      "BAB_financial_statements_2020_separate"
+    ],
+    "relevant_tables": [
+      "BAB_financial_statements_2020_separate|56"
+    ]
+  },
+  {
+    "id": 46,
+    "question": "Thuế TNDN phải nộp cuối năm 2024 của BAB là bao nhiêu triệu đồng?",
+    "answer": 0.08,
+    "relevant_docs": [
+      "BAB_financial_statements_2025_separate"
+    ],
+    "relevant_tables": [
+      "BAB_financial_statements_2025_separate|58"
+    ]
+  },
+  {
+    "id": 47,
+    "question": "Tổng chi phí bán hàng của PLX trong năm 2017 là bao nhiêu nghìn tỷ đồng?",
+    "answer": -6873.95,
+    "relevant_docs": [
+      "PLX_financial_statements_2017_consolidated"
+    ],
+    "relevant_tables": [
+      "PLX_financial_statements_2017_consolidated|13"
+    ]
+  },
+  {
+    "id": 48,
+    "question": "Số dư cuối năm 2015 của Quỹ bình ổn giá xăng dầu tại Tập đoàn Xăng Dầu Việt Nam (PLX) là bao nhiêu tỷ đồng?",
+    "answer": 2377393168.99,
+    "relevant_docs": [
+      "PLX_financial_statements_2016_consolidated"
+    ],
+    "relevant_tables": [
+      "PLX_financial_statements_2016_consolidated|41"
+    ]
+  },
+  {
+    "id": 52,
+    "question": "Số dư phải thu trong nghiệp vụ chuyển tiền nhanh của Ngân hàng TMCP Nam Á (NAB) đến ngày 31/12/2024 là bao nhiêu triệu đồng?",
+    "answer": 440883.0,
+    "relevant_docs": [
+      "NAB_financial_statements_2024_separate"
+    ],
+    "relevant_tables": [
+      "NAB_financial_statements_2024_separate|53"
+    ]
+  },
+  {
+    "id": 57,
+    "question": "Số thuế thu nhập doanh nghiệp phải nộp đầu năm 2021 của CTCP Tập Đoàn PC1 (PC1) là bao nhiêu triệu đồng?",
+    "answer": 157477.37,
+    "relevant_docs": [
+      "IJC_financial_statements_2021_consolidated"
+    ],
+    "relevant_tables": [
+      "IJC_financial_statements_2021_consolidated|40"
+    ]
+  },
+  {
+    "id": 61,
+    "question": "Doanh thu bán hàng và cung cấp dịch vụ của CTCP Dịch vụ Bất động sản Đất Xanh năm 2023 là bao nhiêu tỷ đồng?",
+    "answer": 1997.4,
+    "relevant_docs": [
+      "DXS_financial_statements_2023_consolidated"
+    ],
+    "relevant_tables": [
+      "DXS_financial_statements_2023_consolidated|69"
+    ]
+  },
+  {
+    "id": 65,
+    "question": "Dư nợ cho vay ngành Thương mại, dịch vụ của Ngân hàng TMCP Ngoại thương Việt Nam đến ngày 31/12/2016 là bao nhiêu triệu đồng?",
+    "answer": 117.59,
+    "relevant_docs": [
+      "VCB_financial_statements_2016_separate"
+    ],
+    "relevant_tables": [
+      "VCB_financial_statements_2016_separate|32"
+    ]
+  },
+  {
+    "id": 68,
+    "question": "Tổng lợi nhuận trước thuế của Ngân hàng TMCP Hàng hải Việt Nam năm 2023 là bao nhiêu triệu đồng?",
+    "answer": 3.31,
+    "relevant_docs": [
+      "MSB_financial_statements_2023_consolidated"
+    ],
+    "relevant_tables": [
+      "MSB_financial_statements_2023_consolidated|113"
+    ]
+  },
+  {
+    "id": 71,
+    "question": "Doanh thu thuần về bán hàng và cung cấp dịch vụ của GEG trong năm 2025 là bao nhiêu tỷ đồng?",
+    "answer": 705.63,
+    "relevant_docs": [
+      "GEG_financial_statements_2025_separate"
+    ],
+    "relevant_tables": [
+      "GEG_financial_statements_2025_separate|8"
+    ]
+  },
+  {
+    "id": 83,
+    "question": "Số dư cam kết giao dịch hối đoái của công ty mẹ Ngân hàng TMCP Quốc tế Việt Nam đến ngày 31/12/2020 là bao nhiêu triệu đồng?",
+    "answer": 0.0,
+    "relevant_docs": [
+      "VIB_financial_statements_2020_separate"
+    ],
+    "relevant_tables": [
+      "VIB_financial_statements_2020_separate|7"
+    ]
+  },
+  {
+    "id": 86,
+    "question": "Lợi nhuận sau thuế của Ngân hàng TMCP Sài Gòn Công Thương năm 2024 là bao nhiêu triệu đồng?",
+    "answer": 79168.0,
+    "relevant_docs": [
+      "SGB_financial_statements_2024_separate"
+    ],
+    "relevant_tables": [
+      "SGB_financial_statements_2024_separate|48"
+    ]
+  },
+  {
+    "id": 88,
+    "question": "Tổng tài sản của Ngân hàng TMCP Quốc Dân cuối năm 2019 là bao nhiêu triệu đồng?",
+    "answer": 80405111.0,
+    "relevant_docs": [
+      "NVB_financial_statements_2019_separate"
+    ],
+    "relevant_tables": [
+      "NVB_financial_statements_2019_separate|58"
+    ]
+  },
+  {
+    "id": 90,
+    "question": "Chi phí khấu hao TSCĐ thuộc chi phí quản lý doanh nghiệp của Tập đoàn VINGROUP - CTCP (VIC) năm 2015 là bao nhiêu nghìn tỷ đồng?",
+    "answer": 1110.05,
+    "relevant_docs": [
+      "VIC_financial_statements_2015_consolidated"
+    ],
+    "relevant_tables": [
+      "VIC_financial_statements_2015_consolidated|74"
+    ]
+  },
+  {
+    "id": 93,
+    "question": "Chi phí lãi vay Ngân hàng TMCP Xăng dầu Petrolimex của PLX năm 2022 là bao nhiêu tỷ đồng?",
+    "answer": 54.2,
+    "relevant_docs": [
+      "PLX_financial_statements_2022_consolidated"
+    ],
+    "relevant_tables": [
+      "PLX_financial_statements_2022_consolidated|65"
+    ]
+  },
+  {
+    "id": 98,
+    "question": "Tổng giá trị hàng tồn kho của công ty mẹ CTCP Tasco vào cuối năm 2024 là bao nhiêu tỷ đồng?",
+    "answer": 2.46,
+    "relevant_docs": [
+      "HUT_financial_statements_2024_separate"
+    ],
+    "relevant_tables": [
+      "HUT_financial_statements_2024_separate|27"
+    ]
+  },
+  {
+    "id": 104,
+    "question": "Tăng lợi nhuận trước thuế của công ty mẹ Ngân hàng TMCP Quân đội trong năm 2022 là bao nhiêu triệu đồng?",
+    "answer": 20.32,
+    "relevant_docs": [
+      "MBB_financial_statements_2022_separate_2"
+    ],
+    "relevant_tables": [
+      "MBB_financial_statements_2022_separate_2|8"
+    ]
+  },
+  {
+    "id": 105,
+    "question": "Lãi thuần từ hoạt động dịch vụ của Ngân hàng TMCP Xuất nhập khẩu Việt Nam năm 2020 là bao nhiêu triệu đồng?",
+    "answer": 0.46,
+    "relevant_docs": [
+      "EIB_financial_statements_2020_separate"
+    ],
+    "relevant_tables": [
+      "EIB_financial_statements_2020_separate|9"
+    ]
+  },
+  {
+    "id": 113,
+    "question": "Số dư tiền gửi của cá nhân và các đối tượng khác cuối năm 2015 của Công ty Cổ phần Ngân hàng TMCP Quốc tế Việt Nam (VIB) là bao nhiêu triệu đồng?",
+    "answer": 27.98,
+    "relevant_docs": [
+      "VIB_financial_statements_2015_consolidated"
+    ],
+    "relevant_tables": [
+      "VIB_financial_statements_2015_consolidated|48"
+    ]
+  },
+  {
+    "id": 117,
+    "question": "Giá vốn của dịch vụ đã cung cấp của FPT trong năm 2024 là bao nhiêu nghìn tỷ đồng?",
+    "answer": 34732.06,
+    "relevant_docs": [
+      "FPT_financial_statements_2024_consolidated"
+    ],
+    "relevant_tables": [
+      "FPT_financial_statements_2024_consolidated|61"
+    ]
+  },
+  {
+    "id": 118,
+    "question": "Số dư cuối kỳ dự phòng chung cho các khoản cho vay khách hàng của công ty mẹ Ngân hàng TMCP Ngoại thương Việt Nam đến ngày 31/12/2015 là bao nhiêu triệu đồng?",
+    "answer": 2.69,
+    "relevant_docs": [
+      "VCB_financial_statements_2015_separate"
+    ],
+    "relevant_tables": [
+      "VCB_financial_statements_2015_separate|32"
+    ]
+  },
+  {
+    "id": 120,
+    "question": "Chi phí hoạt động của Ngân hàng TMCP Kiên Long (KLB) năm 2019 là bao nhiêu triệu đồng?",
+    "answer": 0.02,
+    "relevant_docs": [
+      "KLB_financial_statements_2019_consolidated"
+    ],
+    "relevant_tables": [
+      "KLB_financial_statements_2019_consolidated|53"
+    ]
+  },
+  {
+    "id": 121,
+    "question": "Thuế thu nhập doanh nghiệp của công ty mẹ CTCP Tập đoàn GELEX đầu năm 2017 là bao nhiêu triệu đồng?",
+    "answer": -6918.95,
+    "relevant_docs": [
+      "GEX_financial_statements_2017_separate"
+    ],
+    "relevant_tables": [
+      "GEX_financial_statements_2017_separate|34"
+    ]
+  },
+  {
+    "id": 122,
+    "question": "Số dư phải thu khách hàng ngắn hạn của HHV đến ngày 01/01/2022 là bao nhiêu trăm tỷ đồng?",
+    "answer": 0.39,
+    "relevant_docs": [
+      "HHV_financial_statements_2022_separate"
+    ],
+    "relevant_tables": [
+      "HHV_financial_statements_2022_separate|82"
+    ]
+  },
+  {
+    "id": 123,
+    "question": "Tổng cộng vốn chủ sở hữu của SSI cuối năm 2016 là bao nhiêu tỷ đồng?",
+    "answer": 97.68,
+    "relevant_docs": [
+      "SSI_financial_statements_2016_separate"
+    ],
+    "relevant_tables": [
+      "SSI_financial_statements_2016_separate|19"
+    ]
+  },
+  {
+    "id": 124,
+    "question": "Số dư Tiền và các khoản tương đương tiền của Tổng Công ty cổ phần Đầu tư Phát triển Xây dựng (DIG) đầu năm 2024 là bao nhiêu trăm tỷ đồng?",
+    "answer": 2307.31,
+    "relevant_docs": [
+      "DIG_financial_statements_2024_consolidated"
+    ],
+    "relevant_tables": [
+      "DIG_financial_statements_2024_consolidated|9"
+    ]
+  },
+  {
+    "id": 126,
+    "question": "Tiền và các khoản tương đương tiền đầu năm 2023 của Tổng Công ty cổ phần Bia - Rượu - Nước giải khát Sài Gòn (SAB) là bao nhiêu nghìn tỷ đồng?",
+    "answer": 3616.86,
+    "relevant_docs": [
+      "SAB_financial_statements_2023_consolidated"
+    ],
+    "relevant_tables": [
+      "SAB_financial_statements_2023_consolidated|15"
+    ]
+  },
+  {
+    "id": 131,
+    "question": "Tiền và tương đương tiền cuối năm 2025 của công ty mẹ HUT là bao nhiêu tỷ đồng?",
+    "answer": 24.08,
+    "relevant_docs": [
+      "HUT_financial_statements_2025_separate"
+    ],
+    "relevant_tables": [
+      "HUT_financial_statements_2025_separate|15"
+    ]
+  },
+  {
+    "id": 132,
+    "question": "Chi phí lãi vay của công ty mẹ SNZ năm 2021 là bao nhiêu triệu đồng?",
+    "answer": 359.67,
+    "relevant_docs": [
+      "SNZ_financial_statements_2021_separate"
+    ],
+    "relevant_tables": [
+      "SNZ_financial_statements_2021_separate|39"
+    ]
+  },
+  {
+    "id": 136,
+    "question": "Lỗ chênh lệch tỷ giá của CTCP Đường Quảng Ngãi trong năm 2023 là bao nhiêu tỷ đồng?",
+    "answer": 1.25,
+    "relevant_docs": [
+      "QNS_financial_statements_2023_consolidated"
+    ],
+    "relevant_tables": [
+      "QNS_financial_statements_2023_consolidated|46"
+    ]
+  },
+  {
+    "id": 138,
+    "question": "Tổng doanh thu của Công ty Cổ phần Điện Gia Lai (GEG) trong năm 2019 là bao nhiêu trăm tỷ đồng?",
+    "answer": 3.79,
+    "relevant_docs": [
+      "GEG_financial_statements_2019_separate"
+    ],
+    "relevant_tables": [
+      "GEG_financial_statements_2019_separate|52"
+    ]
+  },
+  {
+    "id": 139,
+    "question": "Doanh thu thuần về bán hàng và cung cấp dịch vụ của CTCP Hoàng Anh Gia Lai (HAG) năm 2020 là bao nhiêu nghìn đồng?",
+    "answer": 3176645956.0,
+    "relevant_docs": [
+      "HAG_financial_statements_2020_consolidated"
+    ],
+    "relevant_tables": [
+      "HAG_financial_statements_2020_consolidated|13"
+    ]
+  },
+  {
+    "id": 144,
+    "question": "Số dư khoản mục Dự thu cổ tức, lợi nhuận được chia của công ty mẹ Tập đoàn Bảo Việt đến ngày 31 tháng 12 năm 2025 là bao nhiêu trăm tỷ đồng?",
+    "answer": 1738.94,
+    "relevant_docs": [
+      "BVH_financial_statements_2025_separate"
+    ],
+    "relevant_tables": [
+      "BVH_financial_statements_2025_separate|21"
+    ]
+  }
+]

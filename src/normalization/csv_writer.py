@@ -146,11 +146,16 @@ class CsvWriter:
         )
         return list(existing.values())
 
-    @property
-    def manifest(self) -> list[dict]:
-        return self._manifest
-
     def resolve_local(self, csv_path: str) -> Path:
         """'data/x.csv' -> duong dan that tren dia (de executor doc)."""
-        filename = csv_path.split("/")[-1]
+        filename = csv_path.replace("\\", "/").split("/")[-1]
+        for loc in (
+            self.processed_dir / filename,
+            self.processed_dir.parent / filename,
+            Path("data/processed") / filename,
+            Path("data") / filename,
+            Path(csv_path),
+        ):
+            if loc.exists():
+                return loc
         return self.processed_dir / filename

@@ -1,9 +1,9 @@
-# ── bi mat ───────────────────────────────────────────────────
+# ── bi mat & moi truong ───────────────────────────────────────
 .env
 *.key
 *.pem
 
-# ── Python ───────────────────────────────────────────────────
+# ── Python & build ───────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -18,16 +18,28 @@ env/
 .ruff_cache/
 .ipynb_checkpoints/
 
-# ── du lieu (nang, BTC cung cap — khong day len git) ─────────
-data
+# ── du lieu lon (khong day len git, tai tu nguon / drive) ────
+data/*
+!data/.gitkeep
 
-# ── ket qua chay ─────────────────────────────────────────────
-logs/
+# ── ket qua chay & logs ──────────────────────────────────────
+logs/*
+!logs/.gitkeep
+outputs/*
+!outputs/.gitkeep
 
-# ── he thong ─────────────────────────────────────────────────
+# ── file he thong & tai lieu noi bo ─────────────────────────
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 .claude/
 .analysis/
+.codegraph/
+ARCHITECTURE.md
+repomix-output.xml
+GEMINI.md
+docs/
+scratch/
+
+

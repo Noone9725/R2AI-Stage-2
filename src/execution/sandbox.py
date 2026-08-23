@@ -29,7 +29,7 @@ _CODE_BLOCK_RE = re.compile(r"```(?:python)?\s*(.*?)```", re.DOTALL)
 _FORBIDDEN_NODES = (ast.Import, ast.ImportFrom)
 _FORBIDDEN_NAMES = frozenset({
     "open", "exec", "eval", "compile", "__import__", "input",
-    "globals", "locals", "vars", "getattr", "setattr", "delattr",
+    "vars", "getattr", "setattr", "delattr",
     "exit", "quit", "breakpoint", "memoryview",
 })
 _FORBIDDEN_ATTRS = frozenset({
@@ -45,7 +45,7 @@ _SAFE_BUILTINS: dict[str, Any] = {
     "set": set, "sorted": sorted, "str": str, "sum": sum, "tuple": tuple,
     "zip": zip, "ZeroDivisionError": ZeroDivisionError, "KeyError": KeyError,
     "IndexError": IndexError, "ValueError": ValueError, "TypeError": TypeError,
-    "Exception": Exception,
+    "Exception": Exception, "NameError": NameError,
 }
 
 
@@ -54,19 +54,66 @@ class UnsafeCodeError(Exception):
 
 
 def extract_code(response: str) -> str:
-    """Lay code tu response LLM. Uu tien block ```python."""
-    blocks = _CODE_BLOCK_RE.findall(response)
-    if blocks:
-        return max(blocks, key=len).strip()
+    """Lay code tu response LLM. Uu tien block ```python...``` va kiem tra tinh hop le qua AST."""
+    if not response or not response.strip():
+        return ""
 
-    # Khong co fence: bo cac dong van xuoi o dau
-    lines = response.splitlines()
-    start = 0
-    for i, line in enumerate(lines):
-        if re.match(r"^\s*(?:result|df|[a-z_]\w*\s*=|import |for |if |#)", line):
-            start = i
-            break
-    return "\n".join(lines[start:]).strip()
+    blocks = re.findall(r"```(?:python)?\s*([\s\S]*?)```", response)
+    candidates = blocks if blocks else [response]
+
+    for cand in candidates:
+        cand = cand.strip()
+        try:
+            ast.parse(cand)
+            return cand
+        except SyntaxError:
+            pass
+
+        # Loc cac dong code hop le
+        cleaned = _clean_code_lines(cand)
+        if cleaned:
+            try:
+                ast.parse(cleaned)
+                return cleaned
+            except SyntaxError:
+                pass
+
+    return ""
+
+
+def _clean_code_lines(text: str) -> str:
+    """Loai bo cac dong van ban tu nhien, giai thich, hoac bang bieu markdown."""
+    lines = text.splitlines()
+    valid_lines = []
+    code_started = False
+    
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            if code_started:
+                valid_lines.append(line)
+            continue
+        if stripped.startswith("```") or stripped.startswith("==="):
+            continue
+        if stripped.startswith(("-", "*", "•", "1.", "2.", "3.", "4.", "5.")):
+            continue
+        if any(stripped.startswith(prefix) for prefix in [
+            "Đề xuất", "Để sửa", "Các giá trị", "Mẫu dữ liệu", "Lược đồ",
+            "Cột:", "dòng:", "ticker ", "Lưu ý:", "Giải thích:", "Kết quả:"
+        ]):
+            continue
+
+        # Nhan dien dong code Python hop le
+        if re.match(r"^\s*(?:result\s*=|df\d*\s*=|all_df\s*=|dfs\s*=|sub\d*\s*=|pat_\w*\s*=|equity_\w*\s*=|import |from |for |if |else:|elif |def |return |with |try:|except|#|[a-z_]\w*\s*=)", line):
+            code_started = True
+            valid_lines.append(line)
+        elif code_started and not any(c in line for c in ["Đề xuất", "Để sửa", "những cột không cần"]):
+            valid_lines.append(line)
+
+    return "\n".join(valid_lines).strip()
+
+
+_ALLOWED_MODULES = frozenset({"pandas", "numpy", "math"})
 
 
 class PandasSandbox:
@@ -75,7 +122,7 @@ class PandasSandbox:
         self.timeout_sec = float(
             timeout_sec if timeout_sec is not None else cfg.get("timeout_sec", 15)
         )
-        self.allow_import = bool(cfg.get("allow_import", False))
+        self.allow_import = bool(cfg.get("allow_import", True) or cfg.get("allow_imports", True))
 
     # ── static check ──────────────────────────────────────
 
@@ -86,11 +133,18 @@ class PandasSandbox:
             raise UnsafeCodeError(f"SyntaxError: {exc}") from exc
 
         for node in ast.walk(tree):
-            if not self.allow_import and isinstance(node, _FORBIDDEN_NODES):
-                raise UnsafeCodeError("Khong duoc import trong code sinh ra")
-            if isinstance(node, ast.Name) and node.id in _FORBIDDEN_NAMES:
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    root_mod = alias.name.split(".")[0]
+                    if root_mod not in _ALLOWED_MODULES:
+                        raise UnsafeCodeError(f"Khong duoc import module: {alias.name}")
+            elif isinstance(node, ast.ImportFrom):
+                mod = (node.module or "").split(".")[0]
+                if mod not in _ALLOWED_MODULES:
+                    raise UnsafeCodeError(f"Khong duoc import tu module: {node.module}")
+            elif isinstance(node, ast.Name) and node.id in _FORBIDDEN_NAMES:
                 raise UnsafeCodeError(f"Ten bi cam: {node.id}")
-            if isinstance(node, ast.Attribute) and node.attr in _FORBIDDEN_ATTRS:
+            elif isinstance(node, ast.Attribute) and node.attr in _FORBIDDEN_ATTRS:
                 raise UnsafeCodeError(f"Thuoc tinh bi cam: .{node.attr}")
 
         if "result" not in {
@@ -116,14 +170,39 @@ class PandasSandbox:
             self.check(code)
         except UnsafeCodeError as exc:
             return ExecutionResult(
-                success=False, value=None, raw_value=None, error=str(exc),
-                error_type="UnsafeCodeError", code=code,
+                success=False, value=None, raw_value=None,
+                error=f"UnsafeCodeError: {exc}", error_type="UnsafeCodeError",
+                code=code,
                 elapsed_ms=(time.perf_counter() - started) * 1000, attempt=attempt,
             )
 
+        # Smart wrapper cho pd.read_csv neu LLM van co tinh goi read_csv
+        def _safe_read_csv(filepath: Any, *args: Any, **kwargs: Any) -> pd.DataFrame:
+            p_str = str(filepath).replace("\\", "/")
+            fname = Path(p_str).name
+            for v, df in frames.items():
+                if v == p_str or fname in p_str:
+                    return df.copy()
+            # Thu doc tu data/processed neu file ton tai
+            cand = Path("data/processed") / fname
+            if cand.exists():
+                return pd.read_csv(cand, *args, **kwargs)
+            # Tra ve df dau tien neu co
+            if frames:
+                return next(iter(frames.values())).copy()
+            return pd.DataFrame()
+
+        # Tao bien df tong hop toan bo cac bang
+        combined_df = pd.concat([d for d in frames.values() if isinstance(d, pd.DataFrame)], ignore_index=True) if frames else pd.DataFrame()
+
+        # Tạo module pd an toàn
+        safe_pd = pd
+        # Injects frames và helper
         env: dict[str, Any] = {
             "__builtins__": _SAFE_BUILTINS,
-            "pd": pd, "np": np, "math": math,
+            "pd": safe_pd, "numpy": np, "np": np, "math": math,
+            "df": combined_df.copy(),
+            "all_df": combined_df.copy(),
             **{name: df.copy() for name, df in frames.items()},
         }
 
@@ -148,6 +227,20 @@ class PandasSandbox:
                 error_type="ResultTypeError", code=code,
                 elapsed_ms=elapsed, attempt=attempt,
             )
+
+        # Kiem tra neu result = 0.0 do filter sub bi rong (empty subset)
+        if value == 0.0:
+            empty_subs = [
+                k for k, v in env.items()
+                if isinstance(v, pd.DataFrame) and k not in frames and k not in ("df", "all_df") and v.empty
+            ]
+            if empty_subs:
+                return ExecutionResult(
+                    success=False, value=0.0, raw_value=raw,
+                    error=f"EmptyFilterError: Tap du lieu con `{empty_subs[0]}` bi rong (0 dong) do dieu kien loc qua chat. Hay bo bot dieu kien (vd: bo loc 'period' hoac rut ngan tu khoa item).",
+                    error_type="EmptyFilterError", code=code,
+                    elapsed_ms=elapsed, attempt=attempt,
+                )
 
         return ExecutionResult(
             success=True, value=value, raw_value=raw, error="", error_type="",

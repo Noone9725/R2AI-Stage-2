@@ -193,12 +193,42 @@ def _context_before(text: str, start: int, chars: int) -> str:
     return "\n".join(ln for ln in lines if ln)
 
 
+def stitch_consecutive_tables(tables: list[HtmlTable], text: str) -> list[HtmlTable]:
+    """Ghep cac bang HTML bi be gay qua ranh gioi trang (Fractured Tables).
+
+    Dieu kien:
+      1. Hai bang lien tiep co cung so cot (n_cols).
+      2. Doan text xen giua chi la whitespace hoac marker ===== PAGE N ===== (khong co doan van).
+    """
+    if len(tables) < 2:
+        return tables
+
+    stitched: list[HtmlTable] = []
+    i = 0
+    while i < len(tables):
+        curr = tables[i]
+        while i + 1 < len(tables):
+            nxt = tables[i + 1]
+            gap = text[curr.char_end : nxt.char_start]
+            gap_clean = _PAGE_RE.sub("", _TAG_RE.sub("", gap)).strip()
+            if len(gap_clean) < 30 and nxt.n_cols == curr.n_cols:
+                curr.rows.extend(nxt.rows)
+                curr.char_end = nxt.char_end
+                i += 1
+            else:
+                break
+        stitched.append(curr)
+        i += 1
+    return stitched
+
+
 def extract_html_tables(
     text: str,
     *,
     min_rows: int = 2,
     min_cols: int = 2,
     context_chars: int = 400,
+    stitch: bool = True,
 ) -> list[HtmlTable]:
     """Tim moi the <table> trong van ban, tra ve theo thu tu xuat hien.
 
@@ -223,9 +253,14 @@ def extract_html_tables(
                 context_before=_context_before(text, m.start(), context_chars),
             )
         )
+
+    if stitch and len(out) > 1:
+        out = stitch_consecutive_tables(out, text)
+
     return out
 
 
 def count_html_tables(text: str) -> int:
     """Dem the <table> khong giai ma — dung de do dinh dang nhanh."""
     return len(_TABLE_RE.findall(text))
+

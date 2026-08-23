@@ -2,37 +2,30 @@
 #
 #   pip install -r requirements.txt
 #
-# Nhom theo muc dich: co the chay Stage 1 (corpus) + BM25 retrieval chi
-# voi nhom "core", khong can GPU. Dense retrieval va LLM can nhom "model".
-# Xem README.md muc "Cai dat toi thieu".
+# LƯU Ý CHO GPU LOCAL: Cài đặt PyTorch CUDA tương thích với máy của bạn:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
-# ── core: bat buoc cho moi stage ─────────────────────────────
-pandas==2.3.3
-numpy==2.3.5
-PyYAML==6.0.3
-python-dotenv==1.2.2
-tqdm==4.69.0
-# huggingface_hub: tai kho ViFinQA + bo cau hoi (scripts/00_fetch_data.py).
-# Doc HF_TOKEN tu .env, khong bao gio ghi token vao config/log.
-huggingface-hub==0.36.2
+# ── Core: bắt buộc cho mọi stage ─────────────────────────────
+pandas>=2.2.0
+numpy>=1.26.0
+PyYAML>=6.0
+python-dotenv>=1.0.0
+tqdm>=4.66.0
+huggingface-hub>=0.24.0
 
-# ── model: dense retrieval + rerank + sinh code ──────────────
-# torch: chon dung bien the CUDA cho may cua ban truoc khi cai
-#        (https://pytorch.org/get-started/locally/)
-torch==2.5.1
-transformers==4.46.3
-sentence-transformers==3.3.1
-faiss-cpu==1.9.0
+# ── Model & Inference: Dense retrieval + Quantization + LLM ──
+torch>=2.4.0
+transformers>=4.44.0
+accelerate>=0.26.0
+sentence-transformers>=3.0.0
+faiss-cpu>=1.8.0
+autoawq>=0.2.0
+gptqmodel>=1.0.0
+bitsandbytes>=0.43.0
+protobuf>=5.26.1,<6.0.0dev
 
-# ── serving LLM ──────────────────────────────────────────────
-# vllm: chi can khi llm.backend = "vllm" (Linux + CUDA). Windows dung
-#       backend "transformers". Bo comment neu can.
-# vllm==0.6.4
-#
-# openai: client cho backend "openai" — TRO TOI endpoint self-host
-#         (vLLM/TGI OpenAI-compatible). Model dong (GPT-4o, Gemini...)
-#         BI CAM theo the le: chi duoc dung open-weight <=14B.
-openai==1.59.6
+# ── Serving LLM / Remote API (Tùy chọn) ──────────────────────
+openai>=1.40.0
 
-# ── test ─────────────────────────────────────────────────────
-pytest==8.3.4
+# ── Testing ──────────────────────────────────────────────────
+pytest>=8.0.0

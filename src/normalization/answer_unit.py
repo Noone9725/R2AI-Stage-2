@@ -34,13 +34,15 @@ from ..utils.vn_text import normalize_text
 class AskedUnit(str, Enum):
     """Don vi ma cau hoi yeu cau o dap an."""
 
-    DONG = "dong"                # VND — khong doi
-    NGHIN_DONG = "nghin_dong"    # /1e3
-    TRIEU_DONG = "trieu_dong"    # /1e6
-    TY_DONG = "ty_dong"          # /1e9
-    PERCENT = "percent"          # ratio -> phan tram
-    TIMES = "times"              # "lan" — ty so, GIU NGUYEN
-    NONE = "none"                # cau hoi khong neu don vi
+    DONG = "dong"                    # VND — khong doi
+    NGHIN_DONG = "nghin_dong"        # /1e3
+    TRIEU_DONG = "trieu_dong"        # /1e6
+    TY_DONG = "ty_dong"              # /1e9
+    TRAM_TY_DONG = "tram_ty_dong"    # /1e11
+    NGHIN_TY_DONG = "nghin_ty_dong"  # /1e12
+    PERCENT = "percent"              # ratio -> phan tram
+    TIMES = "times"                  # "lan" — ty so, GIU NGUYEN
+    NONE = "none"                    # cau hoi khong neu don vi
 
 
 # Chia cho he so nay de doi tu VND sang don vi duoc hoi.
@@ -50,37 +52,41 @@ MONETARY_DIVISORS: dict[AskedUnit, float] = {
     AskedUnit.NGHIN_DONG: 1e3,
     AskedUnit.TRIEU_DONG: 1e6,
     AskedUnit.TY_DONG: 1e9,
+    AskedUnit.TRAM_TY_DONG: 1e11,
+    AskedUnit.NGHIN_TY_DONG: 1e12,
 }
 
-# THU TU QUAN TRONG. Do tren bo cau hoi that:
-#  - 7 cau chua CA "%" lan "lan" ("ty le ... bao nhieu lan") -> "lan" phai
-#    duoc xet TRUOC "%" vi no la don vi cua CAU TRA LOI, con "%" thuong
-#    nam trong menh de mo ta ("ty le so huu 51%").
-#  - "ty dong" phai truoc "dong", "trieu dong" truoc "dong": neu khong,
-#    "dong" khop truoc va moi cau tien te deu thanh DONG.
-# Match tren text da bo dau (normalize_text) de chiu duoc cach go khac dau.
+# THU TU QUAN TRONG.
+# 1. TIMES: "bao nhieu lan", "he so ... lan"
+# 2. PERCENT: "diem phan tram", "phan tram", "%" (uu tien truoc dong/tien te de chong dinh chu "dong" trong "dong tien")
+# 3. TIEN TE: nghin ty dong -> tram ty dong -> ty dong -> trieu dong -> nghin dong -> dong
 _UNIT_PATTERNS: tuple[tuple[re.Pattern[str], AskedUnit], ...] = (
     (re.compile(r"\bbao nhieu lan\b"), AskedUnit.TIMES),
     (re.compile(r"\b(?:la|bang|dat)\s+bao nhieu\s+lan\b"), AskedUnit.TIMES),
-    (re.compile(r"\bty\s*dong\b"), AskedUnit.TY_DONG),
-    (re.compile(r"\btrieu\s*dong\b"), AskedUnit.TRIEU_DONG),
-    (re.compile(r"\b(?:nghin|ngan)\s*dong\b"), AskedUnit.NGHIN_DONG),
+    (re.compile(r"\bhe so\b.*?\blan\b"), AskedUnit.TIMES),
+    (re.compile(r"\b(?:diem\s+)?phan\s+tram\b"), AskedUnit.PERCENT),
     (re.compile(r"\bbao nhieu\s*%"), AskedUnit.PERCENT),
-    (re.compile(r"\bbao nhieu phan tram\b"), AskedUnit.PERCENT),
-    (re.compile(r"\bty le phan tram\b"), AskedUnit.PERCENT),
-    (re.compile(r"\bdong\b"), AskedUnit.DONG),
+    (re.compile(r"\bty le\s+.*?(?:phan\s+tram|%)"), AskedUnit.PERCENT),
     (re.compile(r"%"), AskedUnit.PERCENT),
-    (re.compile(r"\bphan tram\b"), AskedUnit.PERCENT),
+    (re.compile(r"\b(?:nghin|ngan)\s+ty\s*dong\b"), AskedUnit.NGHIN_TY_DONG),
+    (re.compile(r"\b(?:nghin|ngan)\s+ty\b"), AskedUnit.NGHIN_TY_DONG),
+    (re.compile(r"\btram\s+ty\s*dong\b"), AskedUnit.TRAM_TY_DONG),
+    (re.compile(r"\btram\s+ty\b"), AskedUnit.TRAM_TY_DONG),
+    (re.compile(r"\bty\s*dong\b"), AskedUnit.TY_DONG),
+    (re.compile(r"\bbao nhieu\s+ty\b"), AskedUnit.TY_DONG),
+    (re.compile(r"\btrieu\s*dong\b"), AskedUnit.TRIEU_DONG),
+    (re.compile(r"\bbao nhieu\s+trieu\b"), AskedUnit.TRIEU_DONG),
+    (re.compile(r"\b(?:nghin|ngan)\s*dong\b"), AskedUnit.NGHIN_DONG),
+    (re.compile(r"\bbao nhieu\s+(?:nghin|ngan)\b"), AskedUnit.NGHIN_DONG),
+    (re.compile(r"\bbao nhieu\s+dong\b"), AskedUnit.DONG),
+    (re.compile(r"\b(?:tinh bang|bang|don vi)\s+dong\b"), AskedUnit.DONG),
+    (re.compile(r"\b(?:vnd|viet nam dong)\b"), AskedUnit.DONG),
     (re.compile(r"\blan\b"), AskedUnit.TIMES),
 )
 
 
 def detect_asked_unit(question: str) -> AskedUnit:
-    """Don vi cau hoi yeu cau. Khong chac -> NONE (khong doi gi ca).
-
-    Nguyen tac an toan: NONE giu nguyen gia tri. Doan bua mot don vi se
-    lam hong cau dang dung, con NONE chi giu nguyen hien trang.
-    """
+    """Don vi cau hoi yeu cau. Khong chac -> NONE (khong doi gi ca)."""
     flat = normalize_text(question)
     for pattern, unit in _UNIT_PATTERNS:
         if pattern.search(flat):
@@ -115,29 +121,117 @@ class AnswerNormalizer:
         asked = unit if unit is not None else detect_asked_unit(question)
         return self.apply(value, asked)
 
-    def apply(self, value: float, asked: AskedUnit) -> NormalizedAnswer:
+    def apply(
+        self, value: float, asked: AskedUnit, *, source_unit: str | None = None, is_fin_inst: bool = False
+    ) -> NormalizedAnswer:
         raw = float(value)
-
-        if asked in MONETARY_DIVISORS:
-            div = MONETARY_DIVISORS[asked]
-            out = raw / div
+        if raw == 0.0:
             return NormalizedAnswer(
-                value=round(out, self.round_to), raw_value=raw,
-                unit=asked, divisor=div, converted=div != 1.0,
+                value=0.0, raw_value=0.0,
+                unit=asked, divisor=1.0, converted=False,
             )
 
-        if asked is AskedUnit.PERCENT:
-            # Code sinh ra da duoc yeu cau tra dang phan tram (pandas_gen
-            # rule 6: 15.3 chu khong phai 0.153). Khong nhan 100 lan nua o
-            # day — se thanh 1530. Chi lam tron.
+        abs_raw = abs(raw)
+
+        # 1. Neu bang nguon co don vi ro rang tu manifest (trieu_dong, ty_dong)
+        if source_unit in ("trieu_dong", "triệu đồng", "trieu"):
+            if asked is AskedUnit.TY_DONG:
+                div = 1e3
+            elif asked is AskedUnit.TRIEU_DONG:
+                div = 1.0
+            elif asked is AskedUnit.NGHIN_TY_DONG:
+                div = 1e6
+            elif asked is AskedUnit.DONG:
+                div = 1e-6
+            elif asked is AskedUnit.NGHIN_DONG:
+                div = 1e-3
+            else:
+                div = 1.0
+            out = raw / div
+            val = round(out, self.round_to)
+            if val == 0.0 and out != 0.0:
+                val = round(out, 4)
+            return NormalizedAnswer(value=val, raw_value=raw, unit=asked, divisor=div, converted=div != 1.0)
+
+        if source_unit in ("ty_dong", "tỷ đồng", "ty"):
+            if asked is AskedUnit.TY_DONG:
+                div = 1.0
+            elif asked is AskedUnit.TRIEU_DONG:
+                div = 1e-3
+            elif asked is AskedUnit.NGHIN_TY_DONG:
+                div = 1e3
+            else:
+                div = 1.0
+            out = raw / div
+            val = round(out, self.round_to)
+            if val == 0.0 and out != 0.0:
+                val = round(out, 4)
+            return NormalizedAnswer(value=val, raw_value=raw, unit=asked, divisor=div, converted=div != 1.0)
+
+        # 2. Neu table_unit la null hoac 'vnd': Danh gia dua tren Magnitude logic
+        div = 1.0
+
+        if asked is AskedUnit.TY_DONG:
+            # So >= 1e8 (>= 100 trieu VND) -> chac chan la VND -> chia 1e9
+            if abs_raw >= 1e8:
+                div = 1e9
+            # So 10.0 <= raw < 1e8 (vi du FTS 444918 tr) -> ban chat da la trieu dong -> chia 1e3
+            elif abs_raw >= 10.0:
+                div = 1e3
+            else:
+                div = 1.0
+            out = raw / div
+            val = round(out, self.round_to)
+            if val == 0.0 and out != 0.0:
+                val = round(out, 4)
+            return NormalizedAnswer(value=val, raw_value=raw, unit=asked, divisor=div, converted=div != 1.0)
+
+        elif asked is AskedUnit.TRIEU_DONG:
+            # Cac ngan hang / cong ty chung khoan thuong co bang lap san don vi trieu dong
+            if is_fin_inst and abs_raw < 1e9:
+                div = 1.0
+            elif abs_raw >= 1e6:
+                div = 1e6
+            else:
+                div = 1.0
+            out = raw / div
+            val = round(out, self.round_to)
+            if val == 0.0 and out != 0.0:
+                val = round(out, 4)
+            return NormalizedAnswer(value=val, raw_value=raw, unit=asked, divisor=div, converted=div != 1.0)
+
+        elif asked is AskedUnit.NGHIN_TY_DONG:
+            if abs_raw >= 1e11:
+                div = 1e12
+            elif abs_raw >= 1e6:
+                div = 1e3
+            else:
+                div = 1.0
+            out = raw / div
+            val = round(out, self.round_to)
+            return NormalizedAnswer(value=val, raw_value=raw, unit=asked, divisor=div, converted=div != 1.0)
+
+        elif asked is AskedUnit.NGHIN_DONG:
+            div = 1e3 if abs_raw >= 1e3 else 1.0
+            out = raw / div
+            val = round(out, self.round_to)
+            return NormalizedAnswer(value=val, raw_value=raw, unit=asked, divisor=div, converted=div != 1.0)
+
+        elif asked is AskedUnit.PERCENT:
+            val = round(raw, self.round_to)
+            if val == 0.0 and raw != 0.0:
+                val = round(raw, 4)
             return NormalizedAnswer(
-                value=round(raw, self.round_to), raw_value=raw,
+                value=val, raw_value=raw,
                 unit=asked, divisor=1.0, converted=False,
             )
 
         # TIMES va NONE: ty so / khong ro don vi -> giu nguyen.
+        val = round(raw, self.round_to)
+        if val == 0.0 and raw != 0.0:
+            val = round(raw, 4)
         return NormalizedAnswer(
-            value=round(raw, self.round_to), raw_value=raw,
+            value=val, raw_value=raw,
             unit=asked, divisor=1.0, converted=False,
         )
 

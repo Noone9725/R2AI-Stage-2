@@ -78,14 +78,44 @@ class SchemaStandardizer:
         )
 
         records: list[dict] = []
+        current_section: str | None = None
+        current_category: str | None = None
+
         # `row_idx` la vi tri dong trong bang goc — chi de truy nguoc va lam
         # tie-breaker deterministic, KHONG mang ngu nghia tai chinh.
         for row_idx, (_, row) in enumerate(df.iterrows()):
-            item = str(row.get(item_col, "")).strip() if item_col else ""
-            if not item:
+            raw_item = str(row.get(item_col, "")).strip() if item_col else ""
+            if not raw_item:
                 continue
+
+            # Kiem tra dong nay co phai dong tieu de nhom khong co so lieu hay khong
+            has_numeric = False
+            for col in list(period_cols.keys()) + list(category_cols):
+                if parse_vn_number(row.get(col), scale=scale) is not None:
+                    has_numeric = True
+                    break
+            if not period_cols and not category_cols and self._first_numeric(row, skip={item_col, code_col}, scale=scale) is not None:
+                has_numeric = True
+
+            if not has_numeric:
+                clean_hdr = re.sub(r"^[-+*\s]+", "", raw_item).strip()
+                if re.match(r"^[IVXLCDM]+\b", clean_hdr) or (clean_hdr.isupper() and len(clean_hdr) > 3):
+                    current_section = clean_hdr
+                    current_category = None
+                else:
+                    current_category = clean_hdr
+                continue
+
+            # Gop tien to phan cap vao ten item
+            item = raw_item
+            prefixes = [p for p in (current_section, current_category) if p]
+            if prefixes:
+                prefix_str = " - ".join(prefixes)
+                if not raw_item.startswith(prefix_str) and prefix_str not in raw_item:
+                    item = f"{prefix_str} - {raw_item}"
+
             item_code = self._extract_code(row, code_col)
-            metric = self.terms.map_one(item)
+            metric = self.terms.map_one(item) or self.terms.map_one(raw_item)
 
             def add(col: object, value: float, cp: ColumnPeriod | None) -> None:
                 records.append(self._record(

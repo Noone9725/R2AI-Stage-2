@@ -57,6 +57,27 @@ def diagnose(result: ExecutionResult, frames: dict[str, pd.DataFrame]) -> str:
         hints.append(f"- {err}")
         hints.append("- Không import, không đọc file. Chỉ dùng biến DataFrame đã cấp và pd/np.")
 
+    elif etype == "EmptyFilterError":
+        hints.append(f"- {err}")
+        hints.append("- Bộ lọc trả về rỗng (sub.empty) do từ khóa hoặc điều kiện không khớp dòng nào.")
+        contains_match = re.findall(r"\.str\.contains\(\s*['\"]([^'\"]+)['\"]", result.code)
+        found_in_any = False
+        if contains_match:
+            kw = contains_match[0]
+            for var, df in frames.items():
+                if "item" in df.columns:
+                    m = df[df["item"].astype(str).str.contains(kw, case=False, na=False, regex=False)]
+                    if not m.empty:
+                        hints.append(f"- CHÚ Ý: Từ khóa '{kw}' ĐƯỢC TÌM THẤY TRONG `{var}`! Hãy đổi code sang lọc trên `{var}`.")
+                        found_in_any = True
+
+        if not found_in_any:
+            hints.append("- Từ khóa trên KHÔNG TỒN TẠI trong bất kỳ DataFrame nào! Hãy chọn lại từ khóa từ danh sách `item` thực tế:")
+            for var, df in frames.items():
+                if "item" in df.columns:
+                    sample = df["item"].astype(str).drop_duplicates().head(10).tolist()
+                    hints.append(f"  * Các `item` thực tế trong `{var}`: {sample}")
+
     elif etype == "TimeoutError":
         hints.append("- Code chạy quá lâu, có thể do vòng lặp. Dùng phép vector hoá của pandas.")
 

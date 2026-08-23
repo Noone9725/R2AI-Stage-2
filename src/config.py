@@ -28,7 +28,6 @@ def _read_yaml(path: Path) -> dict[str, Any]:
 @dataclass(frozen=True)
 class Paths:
     raw: Path
-    interim: Path
     processed: Path
     index: Path
     questions: Path
@@ -36,7 +35,7 @@ class Paths:
     labels: Path
 
     def ensure(self) -> None:
-        for p in (self.raw, self.interim, self.processed, self.index,
+        for p in (self.raw, self.processed, self.index,
                   self.questions, self.outputs, self.labels):
             p.mkdir(parents=True, exist_ok=True)
 

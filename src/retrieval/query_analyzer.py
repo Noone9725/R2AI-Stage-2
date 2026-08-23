@@ -30,8 +30,8 @@ _TICKER_LOWER_RE = re.compile(r"(?<![A-Za-z0-9])([a-z]{3,4}\d?)(?![A-Za-z0-9])")
 _TICKER_ALNUM_RE = re.compile(r"(?<![A-Za-z0-9])([A-Za-z]{2,4}\d{1,2})(?![A-Za-z0-9])")
 _YEAR_RE = re.compile(r"(?<!\d)((?:19|20)\d{2})(?!\d)")
 _YEAR_RANGE_RE = re.compile(
-    r"(?:tu|từ|giai\s*doan|giai\s*đoạn)\s*(?:nam|năm)?\s*((?:19|20)\d{2})"
-    r"\s*(?:den|đến|-|–|toi|tới)\s*(?:nam|năm)?\s*((?:19|20)\d{2})",
+    r"(?:(?:tu|từ|giai\s*doan|giai\s*đoạn)\s*(?:nam|năm)?\s*)?((?:19|20)\d{2})"
+    r"\s*(?:den|đến|[-–]|toi|tới)\s*(?:nam|năm)?\s*((?:19|20)\d{2})",
     re.IGNORECASE,
 )
 
@@ -39,9 +39,13 @@ _YEAR_RANGE_RE = re.compile(
 _FALSE_TICKERS = frozenset({
     "CP", "CTCP", "TNHH", "MTV", "BCTC", "VND", "USD", "EUR", "ROE", "ROA",
     "ROS", "EPS", "EBIT", "CAGR", "AI", "GDP", "VAT", "TSCD", "LNST", "DTT",
-    # Viet tat tieng Viet viet hoa, xuat hien day trong cau hoi that:
-    # "Ngan hang TMCP ...", "cong ty me", "BCTC HN".
     "TMCP", "NHNN", "HDQT", "HN", "CTY", "TSDH", "TSNH", "VCSH", "EBITDA",
+    "CFO", "TNDN", "LNTT", "LDR", "GTCG", "BOT",
+})
+
+_LOWER_WORD_BLOCKLIST = frozenset({
+    "hai", "nam", "sau", "ban", "cho", "vay", "thu", "chi", "moi", "tam", "chin", "mot", "tram", "ngan", "tong",
+    "bao", "nhieu", "trieu", "dong", "khach", "hang", "trong", "theo", "duoc", "nhom", "tren", "duoi"
 })
 
 _COMPARE_HINTS = ("so voi", "so sanh", "cao hon", "thap hon", "chenh lech", "hon kem")
@@ -67,7 +71,17 @@ class QueryAnalyzer:
             needs_derived=self.terms.has_derived(text),
             asked_unit=detect_asked_unit(text).value,
             requested_period=(p.value if (p := detect_requested_period(text)) else ""),
+            report_type=self.extract_report_type(text),
         )
+
+    def extract_report_type(self, text: str) -> str | None:
+        """Nhan dien yeu cau BCTC rieng le (cong ty me) hay hop nhat."""
+        flat = normalize_text(text)
+        if any(h in flat for h in ("cong ty me", "rieng le", "bao cao rieng", "bctc rieng", "cua me", "cua rieng")):
+            return "separate"
+        if any(h in flat for h in ("hop nhat", "toan tap doan", "bctc hn", "bctchn")):
+            return "consolidated"
+        return None
 
     # ── ticker ────────────────────────────────────────────
 
@@ -88,32 +102,52 @@ class QueryAnalyzer:
         known = self.companies.tickers
         found: dict[str, None] = {}
 
-        def take(code: str) -> None:
+        def take(code: str, is_paren: bool = False) -> None:
             code = code.upper()
             if code in _FALSE_TICKERS:
                 return
-            if known and code not in known:
+            if known and code not in known and not is_paren:
                 return
             found.setdefault(code, None)
 
+        # 1. Ticker trong ngoac don: "(VJC)" -> rat dang tin cay
         for m in _TICKER_PAREN_RE.finditer(text):
-            take(m.group(1))
+            take(m.group(1), is_paren=True)
 
-        if not found:
-            for m in _TICKER_BARE_RE.finditer(text):
-                take(m.group(1))
-
-        # Ten cong ty day du / ten giao dich ngan: "Ngan hang TMCP A Chau"
-        # -> ACB, "Hoa Phat" -> HPG. Da doi chieu CSV nen tin duoc.
-        for code in self.companies.resolve(text):
+        # 2. Ten cong ty day du / ten giao dich ngan: "Ngan hang TMCP A Chau"
+        # -> ACB, "Hoa Phat" -> HPG, "CTCP Chung khoan FPT" -> FTS.
+        resolved = self.companies.resolve(text)
+        for code in resolved:
             found.setdefault(code, None)
 
-        # Ma viet thuong: "cac cong ty hpx,kbc,nvl,vic,vpi,vre"
-        for m in _TICKER_LOWER_RE.finditer(text):
-            take(m.group(1))
-        # HT1 / PC1 — 2 chu cai + so, cac regex tren khong bat.
-        for m in _TICKER_ALNUM_RE.finditer(text):
-            take(m.group(1))
+        # Mask cac ten cong ty da nhan dien de tranh bare ticker bat nham sub-word
+        masked_text = text
+        if resolved:
+            for key, ticker in self.companies._entries:
+                if ticker in resolved and key in masked_text.lower():
+                    # Xoa khoang ten da khop khoi chuoi de bare ticker khong bat lai
+                    pattern = re.escape(key)
+                    masked_text = re.sub(pattern, " " * len(key), masked_text, flags=re.IGNORECASE)
+
+        # 3. Ticker dung doc lap viet hoa: "VJC", "HPG", "ACB"
+        if not found:
+            for m in _TICKER_BARE_RE.finditer(masked_text):
+                take(m.group(1))
+
+        # 4. Ma viet thuong hoac so: chi nhan khi code THUC SU nam trong danh sach ticker va khong phai tu tieng Viet thong thuong
+        for m in _TICKER_LOWER_RE.finditer(masked_text):
+            word = m.group(1).lower()
+            if word in _LOWER_WORD_BLOCKLIST:
+                continue
+            c = word.upper()
+            if known and c in known and c not in _FALSE_TICKERS:
+                found.setdefault(c, None)
+
+        # HT1 / PC1 — 2 chu cai + so
+        for m in _TICKER_ALNUM_RE.finditer(masked_text):
+            c = m.group(1).upper()
+            if known and c in known and c not in _FALSE_TICKERS:
+                found.setdefault(c, None)
 
         return list(found)
 

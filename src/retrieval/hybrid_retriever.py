@@ -55,7 +55,7 @@ class HybridRetriever:
         qvec = self.embedder.encode_one(query, is_query=True)
         dense_hits = self.vectors.search(qvec, top_k=top_k, allowed_ids=allowed)
 
-        fused = self._rrf(bm25_hits, dense_hits)
+        fused = self._rrf(bm25_hits, dense_hits, question=question)
         return [self._to_table(ref, sc, bm, dn) for ref, sc, bm, dn in fused[:top_k]]
 
     # ── fusion ────────────────────────────────────────────
@@ -64,6 +64,7 @@ class HybridRetriever:
         self,
         bm25_hits: list[tuple[str, float]],
         dense_hits: list[tuple[str, float]],
+        question: Question | None = None,
     ) -> list[tuple[str, float, float, float]]:
         scores: dict[str, float] = {}
         bm_raw: dict[str, float] = {}
@@ -76,6 +77,16 @@ class HybridRetriever:
         for rank, (ref, score) in enumerate(dense_hits, start=1):
             scores[ref] = scores.get(ref, 0.0) + 1.0 / (self.rrf_k + rank)
             dn_raw[ref] = score
+
+        # Uu tien nhe cac bang BCTC chinh (pos 1-12) khi cau hoi hoi chi tieu cot loi
+        if question and question.metrics:
+            for ref in list(scores.keys()):
+                try:
+                    pos = int(ref.split("|")[-1])
+                    if 1 <= pos <= 12:
+                        scores[ref] += 0.003
+                except Exception:
+                    pass
 
         ordered = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
         return [

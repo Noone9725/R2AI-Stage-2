@@ -21,10 +21,12 @@ def main() -> int:
                         help="Chi xu ly N file dau (de thu nhanh)")
     parser.add_argument("--min-rows", type=int, default=None,
                         help="Bo bang it hon N dong (mac dinh: corpus.min_table_rows)")
+    parser.add_argument("--no-resume", action="store_true",
+                        help="Khong dung checkpoint resume, chay lai tu dau")
     args = parser.parse_args()
 
     bootstrap()
-    stats = CorpusPipeline().run(limit=args.limit, min_rows=args.min_rows)
+    stats = CorpusPipeline().run(limit=args.limit, min_rows=args.min_rows, resume=not args.no_resume)
 
     print("\n=== Stage 1 ===")
     for key, value in stats.items():

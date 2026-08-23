@@ -4,7 +4,7 @@ Chay MOT LAN (hoac khi doi tham so extraction). Ket qua la data/processed/*.csv
 va data/index/manifest.jsonl — dau vao cho ca indexing va inference.
 """
 
-from __future__ import annotations
+from pathlib import Path
 
 from ..config import get_settings
 from ..embeddings.table_card import TableCardBuilder
@@ -13,6 +13,7 @@ from ..extraction.table_detector import TableDetector
 from ..ingestion.loader import CorpusLoader
 from ..normalization.csv_writer import CsvWriter
 from ..normalization.schema_std import SchemaStandardizer
+from ..utils.io import read_json, write_json
 from ..utils.logging import get_logger
 
 log = get_logger(__name__)
@@ -27,19 +28,41 @@ class CorpusPipeline:
         self.cards = TableCardBuilder()
         self.writer = CsvWriter()
 
-    def run(self, limit: int | None = None, min_rows: int | None = None) -> dict[str, int]:
+    def run(
+        self,
+        limit: int | None = None,
+        min_rows: int | None = None,
+        resume: bool = True,
+    ) -> dict[str, int]:
         cfg = get_settings().corpus
         min_rows = min_rows if min_rows is not None else int(cfg.get("min_table_rows", 2))
-
-        # AN TOAN MAC DINH: chi lan chay quet TOAN BO corpus moi duoc thay the
-        # manifest. `--limit N` la lan chay debug -> upsert, khong duoc phep
-        # xoa reference cua nhung bang no khong dung toi.
         mode = "upsert" if limit is not None else "full"
 
-        stats = {"docs": 0, "tables_detected": 0, "tables_written": 0, "skipped": 0}
+        ckpt_file = get_settings().paths.index / ".corpus_done_docs.json"
+        done_docs: set[str] = set()
+        if resume and ckpt_file.exists():
+            try:
+                data = read_json(ckpt_file)
+                if isinstance(data, list):
+                    done_docs = set(data)
+                    log.info("Resume corpus: Tim thay checkpoint %d doc da xu ly", len(done_docs))
+            except Exception as e:
+                log.warning("Khong doc duoc checkpoint corpus (%s) -> chay moi", e)
 
+        stats = {
+            "docs": 0,
+            "resumed_docs": len(done_docs),
+            "tables_detected": 0,
+            "tables_written": 0,
+            "skipped": 0,
+        }
+
+        processed_in_this_run = 0
         for doc in self.loader.iter_documents(limit=limit):
             stats["docs"] += 1
+            if resume and doc.doc_id in done_docs:
+                continue
+
             tables = self.detector.detect(doc)
             stats["tables_detected"] += len(tables)
 
@@ -76,11 +99,24 @@ class CorpusPipeline:
                 )
                 stats["tables_written"] += 1
 
-            if stats["docs"] % 50 == 0:
+            done_docs.add(doc.doc_id)
+            processed_in_this_run += 1
+
+            if processed_in_this_run % 20 == 0:
                 log.info(
-                    "%d doc | %d bang ghi | %d bo qua",
-                    stats["docs"], stats["tables_written"], stats["skipped"],
+                    "%d doc moi (%d tong da xong) | %d bang ghi | %d bo qua",
+                    processed_in_this_run, len(done_docs), stats["tables_written"], stats["skipped"],
                 )
+                # Ghi checkpoint doc da xong
+                try:
+                    write_json(list(done_docs), ckpt_file)
+                except Exception:
+                    pass
+
+        try:
+            write_json(list(done_docs), ckpt_file)
+        except Exception:
+            pass
 
         manifest = self.writer.write_manifest(mode=mode)
         log.info("Xong stage 1 (mode=%s): %s | manifest -> %s", mode, stats, manifest)

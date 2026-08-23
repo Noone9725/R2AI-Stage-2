@@ -102,15 +102,23 @@ class TestScale:
         assert parse_vn_number("-", scale=1e6) is None
 
 
-class TestDetectUnit:
     @pytest.mark.parametrize(
         "context,label",
         [
             ("Đơn vị: triệu đồng", "trieu dong"),
+            ("ĐVT: tr.đ", "trieu dong"),
+            ("ĐVT: tr.đồng", "trieu dong"),
+            ("Đơn vị tính: triệu VND", "trieu dong"),
             ("Đơn vị: tỷ đồng", "ty dong"),
+            ("ĐVT: tỷ", "ty dong"),
+            ("ĐVT: tỷ đ", "ty dong"),
             ("Đơn vị: nghìn đồng", "nghin dong"),
             ("Đơn vị: ngàn đồng", "nghin dong"),
+            ("ĐVT: ng.đ", "nghin dong"),
+            ("ĐVT: nghìn VND", "nghin dong"),
             ("Unit: million VND", "million"),
+            ("Unit: VND'000", "thousand"),
+            ("Unit: thousand VND", "thousand"),
             ("Đơn vị: VND", "vnd"),
         ],
     )
@@ -131,3 +139,4 @@ class TestDetectUnit:
         """Ket hop detect_unit + parse: 1.234 trieu dong = 1.234e9 VND."""
         _, scale = detect_unit("Đơn vị: triệu đồng")
         assert parse_vn_number("1.234", scale=scale) == pytest.approx(1.234e9)
+

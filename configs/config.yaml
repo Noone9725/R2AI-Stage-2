@@ -1,6 +1,5 @@
 paths:
   raw: data/raw                  # kho .txt (financial_statements/<TICKER>/<YEAR>/<DOC>/<DOC>_extracted.txt)
-  interim: data/interim          # bảng thô đã cắt khỏi .txt, chưa chuẩn hoá
   processed: data/processed      # CSV chuẩn hoá — nguồn cho evidence.csv_path
   index: data/index              # BM25 pickle + FAISS index + metadata.parquet
   questions: data/questions      # public_test.json / private_test.json
@@ -14,17 +13,27 @@ corpus:
   keep_empty_tables: false
 
 llm:
-  # Ràng buộc cuộc thi: open-weight, <= 14B, release truoc 2026-06-01
-  model_id: Qwen/Qwen2.5-14B-Instruct
-  backend: vllm                  # vllm | transformers | openai
+  # Cấu hình MẶC ĐỊNH cho GPU T4 (Colab / Kaggle 16GB) & Local GPU
+  model_id: Qwen/Qwen2.5-Coder-7B-Instruct
+  backend: transformers          # transformers | vllm | openai
   base_url: http://localhost:8000/v1
-  max_tokens: 768                # so token sinh moi luot
+  max_tokens: 512                # so token sinh moi luot
   temperature: 0.0
   top_p: 1.0
   seed: 42
   dtype: auto
-  gpu_memory_utilization: 0.90
-  max_model_len: 8192
+  quantization: awq              # awq | gptq | none (chống tràn VRAM 16GB)
+  gpu_memory_utilization: 0.75
+  max_model_len: 4096
+
+llm_local:
+  # Cấu hình MẶC ĐỊNH cho Local GPU RTX 2050 (4GB) / CPU
+  model_id: Qwen/Qwen2.5-Coder-1.5B-Instruct
+  backend: transformers
+  max_tokens: 512
+  temperature: 0.0
+  device_map: auto
+  torch_dtype: float16
 
 execution:
   timeout_sec: 15

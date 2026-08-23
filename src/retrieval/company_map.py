@@ -102,28 +102,89 @@ def _key(text: str) -> str:
     return _PUNCT_RE.sub(" ", flat).strip()
 
 
+DEFAULT_VN_TICKERS = frozenset({
+    "AAA", "AAM", "AAS", "ABB", "ABC", "ACB", "ACC", "ACL", "AGG", "AGR",
+    "AMD", "ANV", "APC", "APG", "APH", "ASM", "ASP", "AST", "BCE", "BCG",
+    "BFC", "BIC", "BID", "BKG", "BMC", "BMI", "BMP", "BSI", "BSR", "BTP",
+    "BTT", "BVH", "BWE", "C32", "C47", "CCL", "CDC", "CHP", "CII", "CLW",
+    "CMX", "CNG", "COM", "CRE", "CSM", "CSV", "CTD", "CTF", "CTG", "CTR",
+    "CTS", "D2D", "DAG", "DAH", "DBC", "DBD", "DBW", "DCM", "DGC", "DGW",
+    "DHA", "DHC", "DHG", "DIG", "DLG", "DLR", "DMC", "DNP", "DPC", "DPG",
+    "DPM", "DPR", "DRC", "DRL", "DS3", "DSN", "DST", "DTA", "DTL", "DTP",
+    "DTT", "DVP", "DXG", "DXS", "EIB", "ELC", "EMC", "EVE", "EVF", "EVG",
+    "FCN", "FDC", "FIR", "FIT", "FLC", "FMC", "FPT", "FRT", "FTS", "GAS",
+    "GDT", "GEG", "GEX", "GIL", "GMC", "GMD", "GSP", "GTA", "GVR", "HAH",
+    "HAI", "HAP", "HAR", "HAX", "HBC", "HCD", "HCM", "HDB", "HDC", "HDG",
+    "HHP", "HHS", "HII", "HMC", "HNG", "HPX", "HPG", "HSG", "HT1", "HTI",
+    "HTL", "HTN", "HU1", "HUB", "HU4", "HUT", "HVG", "HVH", "HVN", "HVX",
+    "IBC", "ICT", "IDI", "IJC", "IMP", "ITA", "ITC", "ITD", "JVC", "KBC",
+    "KDC", "KDH", "KHP", "KMR", "KOS", "KPF", "KSB", "L10", "L14", "L18",
+    "LAF", "LBM", "LCG", "LDG", "LEC", "LGC", "LGL", "LHG", "LIX", "LMH",
+    "LPB", "MBB", "MCG", "MCP", "MDG", "MHC", "MIG", "MSB", "MSN", "MSR",
+    "MWG", "NAF", "NAV", "NBC", "NBB", "NCT", "NHA", "NHH", "NHT", "NKG",
+    "NLG", "NNC", "NO1", "NSC", "NT2", "NTL", "NVL", "OCB", "OGC", "OPC",
+    "PAC", "PAN", "PC1", "PCG", "PDN", "PDR", "PET", "PGC", "PGD", "PGI",
+    "PGV", "PHC", "PHR", "PIT", "PJC", "PJT", "PLC", "PLX", "PNJ", "POM",
+    "POW", "PPC", "PRT", "PSB", "PSD", "PSI", "PSW", "PTC", "PTL", "PVD",
+    "PVI", "PVO", "PVP", "PVT", "PXI", "PXT", "QCG", "RAL", "RDP", "REE",
+    "RIC", "S4A", "SAB", "SAM", "SAV", "SBA", "SBG", "SBL", "SBT", "SBV",
+    "SC5", "SCD", "SCR", "SCS", "SFC", "SFG", "SFI", "SGN", "SGR", "SGS",
+    "SHA", "SHB", "SHI", "SHP", "SHS", "SJF", "SJS", "SKG", "SMA", "SMB",
+    "SMC", "SPM", "SRC", "SRF", "SSB", "SSI", "ST8", "STB", "STC", "STG",
+    "STK", "SVC", "SVI", "SVT", "SZC", "SZL", "TAC", "TAR", "TBX", "TCB",
+    "TCD", "TCH", "TCM", "TCO", "TCS", "TDG", "TDH", "TDM", "TDP", "TDW",
+    "TEG", "TGG", "THG", "TIP", "TIX", "TLG", "TLH", "TN1", "TNA", "TNC",
+    "TNH", "TNI", "TNT", "TPB", "TPC", "TPG", "TRA", "TRC", "TSC", "TTA",
+    "TTB", "TTF", "TV2", "TV3", "TV4", "TVB", "TVC", "TVS", "TYA", "UDJ",
+    "UIC", "VAF", "VCA", "VCB", "VCG", "VCI", "VDP", "VDS", "VFG", "VGC",
+    "VGG", "VGI", "VGL", "VGS", "VGT", "VHC", "VHM", "VIB", "VIC", "VID",
+    "VIP", "VIS", "VIX", "VJC", "VKC", "VMD", "VNE", "VNG", "VNL", "VNM",
+    "VNP", "VNS", "VOS", "VPB", "VPD", "VPG", "VPH", "VPI", "VPS", "VRC",
+    "VRE", "VSC", "VSH", "VSI", "VTB", "VTC", "VTD", "VTO", "VTP", "VTR",
+    "VWS", "VXB", "YEG"
+})
+
+
 class CompanyMap:
     """Tra ticker tu ten cong ty xuat hien trong cau hoi."""
 
     def __init__(self, csv_path: str | Path | None = None):
-        path = Path(csv_path) if csv_path else get_settings().paths.questions / "code_stock.csv"
+        paths_to_try = []
+        if csv_path:
+            paths_to_try.append(Path(csv_path))
+        else:
+            settings = get_settings()
+            paths_to_try.extend([
+                settings.paths.questions / "code_stock.csv",
+                settings.root / "data" / "questions" / "code_stock.csv",
+                settings.root / "data" / "code_stock.csv",
+                settings.paths.raw / "questions" / "code_stock.csv",
+                settings.paths.raw / "code_stock.csv",
+            ])
+
+        found_path: Path | None = None
+        for p in paths_to_try:
+            if p.exists():
+                found_path = p
+                break
+
         self._entries: list[tuple[str, str]] = []  # (key ten cong ty, ticker)
         self.tickers: set[str] = set()
 
-        if not path.exists():
-            log.warning("Khong thay %s — bo qua anh xa ten cong ty", path)
-            return
-
-        with path.open(encoding="utf-8") as fh:
-            for row in csv.DictReader(fh):
-                vals = [v.strip() for v in row.values()]
-                if len(vals) < 2 or not vals[0]:
-                    continue
-                ticker, name = vals[0].upper(), vals[1]
-                self.tickers.add(ticker)
-                key = _key(name)
-                if key:
-                    self._entries.append((key, ticker))
+        if found_path and found_path.exists():
+            with found_path.open(encoding="utf-8") as fh:
+                for row in csv.DictReader(fh):
+                    vals = [v.strip() for v in row.values()]
+                    if len(vals) < 2 or not vals[0]:
+                        continue
+                    ticker, name = vals[0].upper(), vals[1]
+                    self.tickers.add(ticker)
+                    key = _key(name)
+                    if key:
+                        self._entries.append((key, ticker))
+        elif not csv_path:
+            # Chi fallback danh sach default khi chay pipeline tong the va khong truyen file rieng
+            self.tickers = set(DEFAULT_VN_TICKERS)
 
         # Ten dai truoc: tien to chung khong duoc thang ten cu the hon.
         self._entries.sort(key=lambda kv: len(kv[0]), reverse=True)

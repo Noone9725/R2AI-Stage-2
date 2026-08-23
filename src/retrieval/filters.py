@@ -23,15 +23,32 @@ class CandidateFilter:
         """Tap table_ref duoc phep xet. None = khong loc gi ca."""
         tickers = question.tickers or None
         years = question.years or None
+        rep_types = [question.report_type] if question.report_type else None
 
-        # 1. loc ca ticker + nam
+        # 1. loc ca ticker + nam + report_type (neu co chi dinh ro)
+        if rep_types:
+            refs = self.store.filter_refs(
+                tickers=tickers, years=years, year_tolerance=self.year_tolerance, report_types=rep_types
+            )
+            if refs:
+                return refs
+
+            if tickers and years:
+                refs = self.store.filter_refs(
+                    tickers=tickers, years=years, year_tolerance=self.year_tolerance + 2, report_types=rep_types
+                )
+                if refs:
+                    log.debug("Q%d: noi long year_tolerance voi report_type", question.id)
+                    return refs
+
+        # 2. loc ca ticker + nam (bao gom ca separate lan consolidated de khong bo sot bang o cac ngan hang/doanh nghiep)
         refs = self.store.filter_refs(
             tickers=tickers, years=years, year_tolerance=self.year_tolerance
         )
         if refs:
             return refs
 
-        # 2. noi long nam (BCTC nam N chua so lieu N-1, N-2)
+        # 3. noi long nam (BCTC nam N chua so lieu N-1, N-2)
         if tickers and years:
             refs = self.store.filter_refs(
                 tickers=tickers, years=years, year_tolerance=self.year_tolerance + 2

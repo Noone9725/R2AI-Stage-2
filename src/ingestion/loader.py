@@ -66,16 +66,22 @@ class CorpusLoader:
                 f"Khong thay thu muc raw: {self.raw_dir}. "
                 "Giai nen kho BCTC cua BTC vao day truoc."
             )
-        files = sorted(self.raw_dir.rglob("*.txt"))
-        log.info("Tim thay %d file .txt trong %s", len(files), self.raw_dir)
+        files = [p for p in sorted(self.raw_dir.rglob("*.txt")) if p.is_file()]
+        log.info("Tim thay %d file .txt hop le trong %s", len(files), self.raw_dir)
         return files
 
     def iter_documents(self, limit: int | None = None) -> Iterator[RawDocument]:
-        for i, path in enumerate(self.list_files()):
-            if limit is not None and i >= limit:
+        files = self.list_files()
+        yielded = 0
+        for path in files:
+            if limit is not None and yielded >= limit:
                 break
+            if not path.is_file() or not path.exists():
+                continue
             try:
-                yield self.load_one(path)
+                doc = self.load_one(path)
+                yield doc
+                yielded += 1
             except Exception as exc:  # noqa: BLE001 — mot file loi khong duoc chan pipeline
                 log.warning("Bo qua %s: %s", path.name, exc)
 

@@ -59,9 +59,14 @@ def main() -> int:
 
     expected_ids = None
     if args.questions:
-        qs = read_json(Path(args.questions))
-        if isinstance(qs, dict):
-            qs = qs.get("questions", qs.get("data", []))
+        qpath = Path(args.questions)
+        if str(qpath).endswith(".jsonl"):
+            from src.utils.io import read_jsonl
+            qs = list(read_jsonl(qpath))
+        else:
+            qs = read_json(qpath)
+            if isinstance(qs, dict):
+                qs = qs.get("questions", qs.get("data", []))
         expected_ids = [int(q["id"]) for q in qs]
 
     packager = SubmissionPackager()

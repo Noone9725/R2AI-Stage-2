@@ -23,7 +23,12 @@ class Reranker:
         self.enabled = bool(cfg.get("enabled", True))
         self.top_k = int(cfg.get("top_k", 20))
         self.input_k = int(cfg.get("input_k", 50))
-        self.device = cfg.get("device", "cuda")
+        dev = cfg.get("device", "cuda")
+        if dev == "cuda":
+            import torch
+            if not torch.cuda.is_available():
+                dev = "cpu"
+        self.device = dev
         self.batch_size = batch_size
         self._model: Any | None = None
         self._failed = False

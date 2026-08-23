@@ -26,16 +26,29 @@ class PandasGenerator:
 
     # ── load frames ───────────────────────────────────────
 
-    def load_frames(self, retrieval: RetrievalResult) -> tuple[dict[str, pd.DataFrame], dict[str, str]]:
+    def load_frames(
+        self,
+        retrieval: RetrievalResult,
+        question: Question | None = None,
+        max_tables: int | None = None,
+    ) -> tuple[dict[str, pd.DataFrame], dict[str, str]]:
         """Tra ve ({var: df}, {var: csv_path}).
 
-        Bang khong doc duoc thi bo qua chu khong ra loi — mot CSV hong khong
-        nen keo ca cau hoi ve 0 khi con bang khac dung duoc.
+        Bang khong doc duoc thi bo qua chu khong ra loi.
+        Neu la cau hoi don le (1 cong ty, 1 nam, khong phai chi so phai sinh) -> nap dung 1 bang tot nhat (df1) de tranh LLM cong don nhieu bang.
         """
         frames: dict[str, pd.DataFrame] = {}
         var_to_csv: dict[str, str] = {}
 
-        for i, table in enumerate(retrieval.tables, start=1):
+        is_single = (
+            question is not None
+            and not question.needs_derived
+            and len(question.tickers) <= 1
+            and len(question.years) <= 1
+        )
+        table_limit = 1 if is_single else (max_tables or len(retrieval.tables))
+
+        for i, table in enumerate(retrieval.tables[:table_limit], start=1):
             if not table.csv_path:
                 continue
             local = self.csv.resolve_local(table.csv_path)
@@ -60,7 +73,7 @@ class PandasGenerator:
         var_to_csv: dict[str, str] | None = None,
     ) -> GeneratedQuery:
         if frames is None or var_to_csv is None:
-            frames, var_to_csv = self.load_frames(retrieval)
+            frames, var_to_csv = self.load_frames(retrieval, question=question)
 
         if not frames:
             return GeneratedQuery(
@@ -72,9 +85,10 @@ class PandasGenerator:
             "pandas_gen",
             question=question.question,
             variables=pt.format_variables(var_to_csv),
-            schemas=pt.format_schemas(frames),
+            schemas=pt.format_schemas(frames, question_text=question.question),
             formulas=pt.format_formulas(question.metrics),
             period_hint=pt.format_period_hint(question),
+            item_anchors=pt.format_item_anchors(frames, question.question, metrics=question.metrics),
         )
 
         try:
@@ -86,8 +100,13 @@ class PandasGenerator:
                 reasoning=f"loi LLM: {exc}", attempt=0, raw_response="",
             )
 
+        code = extract_code(response)
+        if not code and response:
+            from ..execution.sandbox import _clean_code_lines
+            code = _clean_code_lines(response)
+
         return GeneratedQuery(
-            pandas_query=extract_code(response),
+            pandas_query=code,
             var_to_csv=var_to_csv,
             reasoning="",
             attempt=1,

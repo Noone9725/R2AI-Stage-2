@@ -35,12 +35,22 @@ UNIT_SCALES: dict[str, float] = {
 }
 
 _UNIT_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"\bty\s*(?:dong|vnd)\b"), "ty dong"),
-    (re.compile(r"\btrieu\s*(?:dong|vnd)\b"), "trieu dong"),
-    (re.compile(r"\b(?:nghin|ngan)\s*(?:dong|vnd)\b"), "nghin dong"),
+    # Tỷ
+    (re.compile(r"\bty\s*(?:dong|vnd|d)\b"), "ty dong"),
+    (re.compile(r"\b(?:dvt|don vi|don vi tinh)\s*:\s*ty(?:\s*d|\s*dong|\s*vnd)?\b"), "ty dong"),
     (re.compile(r"\bbillion\b"), "billion"),
+    # Triệu
+    (re.compile(r"\btrieu\s*(?:dong|vnd|d)\b"), "trieu dong"),
+    (re.compile(r"\btr\s*(?:dong|vnd|d)\b"), "trieu dong"),
+    (re.compile(r"\b(?:dvt|don vi|don vi tinh)\s*:\s*tr(?:\s*d|\s*dong|\s*vnd)?\b"), "trieu dong"),
     (re.compile(r"\bmillion\b"), "million"),
+    # Nghìn / Ngàn
+    (re.compile(r"\b(?:nghin|ngan)\s*(?:dong|vnd|d)\b"), "nghin dong"),
+    (re.compile(r"\bng\s*(?:dong|vnd|d)\b"), "nghin dong"),
+    (re.compile(r"\b(?:dvt|don vi|don vi tinh)\s*:\s*ng(?:\s*d|\s*dong|\s*vnd)?\b"), "nghin dong"),
     (re.compile(r"\bthousand\b"), "thousand"),
+    (re.compile(r"\bvnd[\s\'\’]*000\b"), "thousand"),
+    # Đơn vị đồng / vnd cơ số
     (re.compile(r"\b(?:vnd|dong)\b"), "vnd"),
 )
 

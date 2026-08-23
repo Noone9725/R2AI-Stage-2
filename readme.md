@@ -1,216 +1,332 @@
 # R2AI Stage 2 — Financial Table Retrieval & Text-to-Pandas
 
-Dự án này là giải pháp cho Stage 2 của cuộc thi **ViFinQA (Financial Table Retrieval & Text-to-Pandas)**. Mục tiêu của hệ thống là tự động trả lời các câu hỏi tài chính tiếng Việt dựa trên kho Báo cáo tài chính (BCTC) của các công ty niêm yết bằng cách truy hồi đúng bảng số liệu và sinh câu lệnh Pandas thực thi được để tính toán đáp án.
-
-Đây là **pipeline chạy offline theo lô (batch)**: chạy một lần trên toàn bộ tập câu hỏi kiểm thử và đóng gói kết quả thành file ZIP nộp lên hệ thống chấm điểm của Ban tổ chức (BTC).
+Dự án này là giải pháp toàn diện cho **Stage 2** của cuộc thi **ViFinQA (Financial Table Retrieval & Text-to-Pandas)**. Mục tiêu của hệ thống là tự động trả lời các câu hỏi tài chính tiếng Việt dựa trên kho Báo cáo tài chính (BCTC) của các doanh nghiệp niêm yết bằng cách:
+1. **Truy hồi chính xác bảng số liệu mục tiêu** từ hàng trăm nghìn bảng BCTC phức tạp.
+2. **Sinh mã Pandas (Text-to-Pandas)** thông qua mô hình ngôn ngữ lớn (LLM).
+3. **Thực thi mã an toàn trong Sandbox AST** kèm vòng lặp tự sửa lỗi (**Self-Correction Loop**).
+4. **Chuẩn hóa đơn vị và đóng gói tự động** file `submission.zip` đạt 100% chuẩn quy định của Ban tổ chức.
 
 ---
 
-## 1. Luồng hoạt động của Hệ thống (Pipeline)
+## 1. Kiến trúc Hệ thống
 
-Hệ thống bao gồm các bước chính sau:
-1.  **Ingestion & Parsing**: Duyệt qua kho BCTC gốc dạng `.txt` OCR, trích xuất các bảng biểu dạng HTML, sửa lỗi dính chữ/số (glued numbers) do rowspan gây ra.
-2.  **Standardization (Chuẩn hóa cấu trúc)**: Ép các bảng từ định dạng bảng ngang (Wide) về cấu trúc dọc (Long Schema) thống nhất. Nhận diện các đơn vị đo lường (`vnd`, `trieu dong`, `ty dong`) và giải mã kỳ báo cáo (đầu kỳ `opening` hay cuối kỳ `closing`).
-3.  **Indexing**: Lập chỉ mục từ khóa (BM25) và ngữ nghĩa (Dense Vector dùng model `BAAI/bge-m3`) trên các thẻ mô tả bảng (Table Cards).
-4.  **Hybrid Retrieval & Reranking**: 
-    *   Phân tích thực thể trong câu hỏi (Mã chứng khoán, năm, chỉ tiêu cần tìm).
-    *   Áp dụng bộ lọc cứng (Hard Filter) theo mã chứng khoán và năm.
-    *   Truy hồi lai (BM25 + Dense) kết hợp RRF (Reciprocal Rank Fusion).
-    *   Sắp xếp lại ứng viên (Reranking) bằng Cross-Encoder `BAAI/bge-reranker-v2-m3`.
-    *   Chỉ định động số lượng bảng cần chọn (`TableSelector`) để tối ưu điểm F2.
-5.  **Pandas Code Generation**: Sinh truy vấn Pandas bằng LLM (mặc định là `Qwen/Qwen2.5-14B-Instruct`) dựa trên schema bảng đã truy hồi và các gợi ý công thức.
-6.  **Sandbox Execution & Self-Repair**: Thực thi code trong môi trường AST an toàn. Nếu xảy ra lỗi runtime (KeyError, IndexError...), hệ thống sẽ chẩn đoán lỗi và gửi gợi ý để LLM tự sửa lỗi (`Self-Repair` tối đa 3 lần).
-7.  **Packaging**: Kiểm tra định dạng schema khắt khe và đóng gói file ZIP sẵn sàng đem nộp.
+Hệ thống được thiết kế theo mô hình xử lý theo đợt (**Batch Pipeline**) chịu lỗi cao:
+
+```
+[00. Raw BCTC .txt] ──► 01. Corpus Pipeline (Table Stitching ghép bảng gãy + Prefix phân cấp)
+                                  │
+                                  ▼
+[02. Index Pipeline] ──► BM25 + Dense Vectors (BGE-M3) + Lọc BCTC Mẹ vs Hợp nhất
+                                  │
+                                  ▼
+[03. Inference Pipeline] ──► Hybrid Retrieval ──► Few-Shot CoT Prompt ──► LLM (Qwen2.5-14B-AWQ)
+                                  │                                              │
+                                  ▼                                              ▼
+                             Checkpointing ◄── Pandas Sandbox AST ◄── Self-Repair (Tối đa 3 lượt)
+                                  │
+                                  ▼
+[04. Packaging Pipeline] ──► Validate Schema 100% ──► Đóng gói submission.zip
+                                  │
+                                  ▼
+[05. Evaluation Pipeline] ──► Đo lường 3 trục
+```
 
 ---
 
 ## 2. Cấu trúc Thư mục Dự án
 
 ```
-R2AI-Stage-2-main/
-├── main.py                   # Điểm khởi chạy toàn bộ pipeline
-├── requirements.txt          # Danh sách thư viện cần thiết
-├── .env                      # File cấu hình biến môi trường (token, khóa API) - KHÔNG COMMIT
-├── configs/                  # Chứa cấu hình YAML và Prompts
-│   ├── config.yaml           # Cấu hình đường dẫn, tham số LLM và thực thi sandbox
-│   ├── retrieval.yaml        # Tham số cho BM25, Dense Vector, Rerank và Selector
-│   └── prompts/              # Thư mục chứa prompt sinh code và self-repair
-├── src/                      # Mã nguồn chính của dự án
-│   ├── config.py             # Parser nạp configs/config.yaml và biến môi trường
-│   ├── schemas.py            # Khai báo các Dataclass dùng chung toàn pipeline
-│   ├── ingestion/            # Bộ quét và phân tích file BCTC thô
-│   ├── extraction/           # Trích xuất bảng HTML và sửa lỗi dính số OCR
-│   ├── normalization/        # Chuẩn hóa bảng, chuyển đổi số và phát hiện kỳ báo cáo/đơn vị
-│   ├── embeddings/           # Tạo card mô tả bảng và quản lý model Embedding
-│   ├── vectordb/             # Quản lý kho dữ liệu BM25, FAISS Vector và Metadata
-│   ├── retrieval/            # Bộ phân tích truy vấn, áp bộ lọc cứng, tìm kiếm lai và xếp hạng lại
-│   ├── generation/           # Chuẩn bị dữ liệu và gọi LLM để sinh code Pandas
-│   ├── execution/            # Chạy thử code Pandas trong Sandbox AST và bộ tự sửa lỗi (Self-Repair)
-│   ├── submission/           # Xây dựng và kiểm tra tính hợp lệ của file nộp bài
-│   ├── evaluation/           # Tính điểm đánh giá hệ thống (Precision, Recall, F2, Accuracy)
-│   ├── pipeline/             # Các lớp điều phối luồng xử lý (Corpus, Index, Answer)
-│   └── utils/                # Các thư viện bổ trợ về logging, xử lý văn bản tiếng Việt
-├── scripts/                  # Các file script CLI chạy từng bước độc lập
-│   ├── 00_fetch_data.py      # Tải dữ liệu ViFinQA từ Hugging Face
-│   ├── 01_build_corpus.py    # Xử lý OCR -> Tạo các file CSV chuẩn hóa và manifest
-│   ├── 02_build_index.py     # Tạo chỉ mục BM25 và Dense Vector Index
-│   ├── 03_run_inference.py   # Chạy suy diễn trả lời bộ câu hỏi
-│   ├── 04_package.py         # Kiểm tra tính hợp lệ và đóng gói ZIP nộp bài
-│   └── 05_evaluate.py        # Đánh giá kết quả trên tập nhãn tự gán (gold labels)
-├── tests/                    # Thư mục kiểm thử (pytest)
-├── data/                     # Thư mục chứa dữ liệu đầu vào và các index (được gitignore)
-│   ├── raw/                  # File BCTC .txt của BTC
-│   ├── interim/              # Bảng thô đã trích xuất chưa chuẩn hóa
-│   ├── processed/            # File CSV bảng số liệu chuẩn hóa
-│   ├── index/                # Chỉ mục BM25, FAISS và manifest.jsonl
-│   └── questions/            # Tập câu hỏi câu hỏi câu hỏi test (questions.jsonl)
-├── labels/                   # Tập nhãn tự gán gold.json phục vụ test offline - GIỮ TRONG GIT
-├── logs/                     # File log chạy ứng dụng
-└── outputs/                  # Thư mục chứa kết quả predictions và submissions zip
+R2AI-Stage-2/
+├── main.py                   # Điểm điều phối toàn bộ pipeline (chạy 1 lệnh hoặc từng stage)
+├── requirements.txt          # Danh sách thư viện cần thiết (Torch CUDA, Transformers, vLLM...)
+├── .env.example              # Mẫu cấu hình biến môi trường (HF_TOKEN, LLM_API_KEY)
+├── configs/                  # Thư mục cấu hình hệ thống
+│   ├── config.yaml           # Cấu hình đường dẫn, model LLM, vLLM, và tham số sandbox
+│   ├── retrieval.yaml        # Tham số cho BM25, Dense Vector, Selector và Hard Filters
+│   └── prompts/              # File prompt mẫu sinh code Pandas và tự sửa lỗi
+├── src/                      # Mã nguồn lõi của hệ thống
+│   ├── ingestion/            # Bộ quét và bóc tách BCTC thô
+│   ├── extraction/           # Xử lý bảng HTML, sửa lỗi dính chữ/số OCR, ghép bảng gãy
+│   ├── normalization/        # Chuẩn hóa cấu trúc dọc (Long CSV), số liệu VNĐ và đơn vị
+│   ├── embeddings/           # Tạo Table Cards và quản lý Embedding Model (BGE-M3)
+│   ├── vectordb/             # Lưu trữ và truy vấn BM25, FAISS Vector và MetadataStore
+│   ├── retrieval/            # Phân tích câu hỏi, áp bộ lọc cứng và bộ chọn bảng TableSelector
+│   ├── generation/           # Chuẩn bị context và gọi LLM sinh code Pandas
+│   ├── execution/            # Sandbox AST an toàn và module tự sửa lỗi (SelfRepairExecutor)
+│   ├── submission/           # Đóng gói và kiểm tra tính hợp lệ của bài nộp
+│   ├── evaluation/           # Bộ đánh giá toàn diện 3 trục (Doc F2, Table F2, Answer Accuracy)
+│   └── pipeline/             # Các lớp điều phối toàn trình (Corpus, Index, Answer)
+├── notebooks/                # Jupyter Notebooks điều phối
+│   ├── pipeline_runner_colab.ipynb   # Master Notebook cho Google Colab (NVMe + Drive Backup)
+│   └── pipeline_runner_kaggle.ipynb  # Master Notebook cho Kaggle GPU T4 (/kaggle/working)
+├── data/                     # Thư mục dữ liệu (được loại trừ khỏi Git)
+│   ├── raw/                  # File văn bản BCTC gốc của BTC (.txt)
+│   ├── processed/            # 119,045 File CSV bảng số liệu chuẩn hóa
+│   ├── index/                # Chỉ mục BM25, FAISS Vector và manifest.jsonl
+│   └── questions/            # Tập câu hỏi kiểm thử (questions.jsonl) & mã CK (code_stock.csv)
+├── labels/                   # Tập nhãn chuẩn gold.json để eval local (được giữ trong Git)
+└── outputs/                  # Thư mục lưu kết quả dự đoán và ZIP bài nộp
 ```
 
 ---
 
-## 3. Cài đặt Môi trường
+## 3. Cài đặt & Hướng dẫn Vận hành trên 3 Môi trường
 
-Dự án yêu cầu cài đặt Python 3.10 trở lên. Hãy làm theo các bước sau để thiết lập môi trường:
+Dự án được thiết kế để hoạt động mượt mà trên cả 3 môi trường: **Local**, **Google Colab**, và **Kaggle**.
 
+### 🌟 Cách Clone & Khôi phục Dữ liệu (Dành cho Repo không chứa data thô)
+Khi bạn hoặc người dùng khác clone repo từ GitHub:
 ```bash
-# 1. Tạo môi trường ảo (Virtual Environment)
-python -m venv .venv
-
-# 2. Kích hoạt môi trường ảo
-# Trên Windows:
-.venv\Scripts\activate
-# Trên Linux/macOS:
-source .venv/bin/activate
-
-# 3. Nâng cấp pip và cài đặt các thư viện cần thiết
-pip install --upgrade pip
-pip install -r requirements.txt
-
-# 4. Cấu hình biến môi trường
-cp .env.example .env
+git clone https://github.com/Noone9725/R2AI-Stage-2.git
+cd R2AI-Stage-2
 ```
-*Sau khi copy file `.env`, hãy mở file và điền thông tin `HF_TOKEN` nếu bạn sử dụng các mô hình gated hoặc cần tương tác với HuggingFace.*
-
-**Lưu ý khi sử dụng GPU**:
-*   Dự án mặc định cài đặt Torch bản CPU. Nếu bạn có GPU CUDA, vui lòng cài đặt phiên bản Torch phù hợp trước qua hướng dẫn của [PyTorch](https://pytorch.org/get-started/locally/).
-*   Thư viện `vllm` hỗ trợ tăng tốc suy diễn và chỉ hoạt động trên môi trường Linux + GPU. Nếu chạy trên Windows, hãy đổi cấu hình `llm.backend` trong `configs/config.yaml` từ `vllm` sang `transformers`.
+Thư mục `data/` nặng (>100,000 file CSV) được loại trừ khỏi Git để tối ưu dung lượng repo. Bạn có 2 cách để nạp dữ liệu:
+* **Cách 1 (Nhanh nhất - Khuyên dùng):** Sử dụng file `data_backup.zip` đã được đóng gói sẵn. Chỉ cần giải nén file zip này vào thư mục `data/` của dự án.
+* **Cách 2 (Xây dựng từ đầu):** Chạy `python main.py fetch` $\rightarrow$ `python main.py corpus` $\rightarrow$ `python main.py index` để hệ thống tự tải BCTC gốc từ HuggingFace và bóc tách tự động.
 
 ---
 
-## 4. Hướng dẫn Chạy Hệ thống từng bước
-
-### Bước 0: Tải dữ liệu cuộc thi
-Tải toàn bộ bộ câu hỏi và kho báo cáo tài chính về thư mục dữ liệu cục bộ:
-```bash
-python scripts/00_fetch_data.py
-```
-*If you only want to quickly test with questions and stock tickers, run: `python scripts/00_fetch_data.py --questions-only`*
-
-### Bước 1: Trích xuất và Chuẩn hóa kho dữ liệu (Build Corpus)
-Đọc toàn bộ file `.txt` gốc, bóc tách bảng HTML, chuẩn hóa thành dạng dọc (Long CSV) và ghi lại file `manifest.jsonl`. Đây là bước tốn nhiều thời gian nhất:
-```bash
-python scripts/01_build_corpus.py
-```
-*Mẹo debug: Có thể chạy thử trên 20 file tài liệu đầu tiên bằng tham số `--limit 20`: `python scripts/01_build_corpus.py --limit 20`*
-
-### Bước 2: Xây dựng chỉ mục tìm kiếm (Build Index)
-Đọc manifest đã tạo ở Stage 1 để lập chỉ mục từ khóa (BM25) và ngữ nghĩa (Dense Vector). File index sẽ được ghi vào `data/index/bm25.pkl` và `data/index/vectors.pkl`:
-```bash
-python scripts/02_build_index.py
-```
-*Nếu bạn không có GPU hoặc muốn chạy nhanh bỏ qua phần dense vector, hãy dùng cờ `--skip-dense`.*
-
-### Bước 3: Chạy suy diễn trả lời câu hỏi (Inference)
-Đọc bộ câu hỏi, thực hiện tìm kiếm bảng, gọi LLM sinh code Pandas và chạy thực thi để tìm ra đáp án cuối cùng:
-```bash
-python scripts/03_run_inference.py --questions data/questions/questions.jsonl
-```
-*Bạn có thể giới hạn số câu chạy thử để kiểm thử nhanh bằng cờ `--limit 5`.*
-
-### Bước 4: Kiểm tra và Đóng gói (Packaging)
-Xác thực tính đúng đắn về định dạng của tệp kết quả dự đoán (schema, kiểu dữ liệu, đường dẫn tương đối...) và đóng gói tệp kết quả ZIP để nộp:
-```bash
-# Chỉ kiểm tra lỗi định dạng, không tạo file ZIP
-python scripts/04_package.py --pred outputs/predictions/questions.json --check-only
-
-# Kiểm tra định dạng và đóng gói tệp nộp bài
-python scripts/04_package.py --pred outputs/predictions/questions.json --name run_01
-```
-
-### Bước 5: Đánh giá nội bộ (Local Evaluation)
-Đánh giá độ chính xác của tệp kết quả dự đoán so với nhãn chuẩn tự gán trong thư mục `labels/gold.json`:
-```bash
-python scripts/05_evaluate.py --pred outputs/predictions/questions.json
-```
-*Xem 30 câu hỏi có điểm số tệ nhất để debug: `python scripts/05_evaluate.py --pred outputs/predictions/questions.json --worst 30`*
+### 3.1. Chạy trên Google Colab (GPU T4 / A100)
+Mở file [notebooks/pipeline_runner_colab.ipynb](notebooks/pipeline_runner_colab.ipynb) trên Google Colab:
+1. **Mục 1 (Môi trường):** Mount Google Drive, đồng bộ mã nguồn vào ổ SSD NVMe tạm (`/content/R2AI-Stage-2`) và cài đặt `requirements.txt`.
+2. **Mục 2 (Dữ liệu - Chọn 2.A hoặc 2.B):**
+   * **Phương án 2.A:** Nạp nhanh và giải nén `data_backup.zip` từ Google Drive `/MyDrive/backup/data_backup.zip` vào ổ NVMe (mất ~30s).
+   * **Phương án 2.B:** Xây dựng toàn bộ từ đầu theo từng bước: `fetch` $\rightarrow$ `corpus` $\rightarrow$ `index` $\rightarrow$ đóng gói `data_backup.zip` lưu lại vào Drive.
+3. **Mục 3 (Suy luận):** Chạy lệnh suy luận với mô hình `Qwen/Qwen2.5-Coder-7B-Instruct` (4-bit BitsAndBytes). Hệ thống tự động sao lưu checkpoint kép (vừa lưu local vừa sync sang Drive sau mỗi 5 câu).
+4. **Mục 4 & 5 (Đóng gói & Đánh giá):** Tạo file `submission.zip` lưu vào Google Drive và đánh giá trên tập nhãn chuẩn `gold.json`.
 
 ---
 
-## 5. Hướng dẫn Chạy Kiểm thử (Testing)
-
-Dự án cung cấp bộ unit test phong phú bảo vệ các cấu phần dễ sai sót nhất. Để chạy toàn bộ test, thực thi lệnh sau từ thư mục gốc của dự án:
-
-```bash
-# Chạy toàn bộ test
-pytest
-
-# Chạy ở chế độ gọn nhẹ (quiet)
-pytest -q
-
-# Chạy một file test cụ thể và hiển thị chi tiết (verbose)
-pytest tests/test_number_parser.py -v
-```
-
-Các nhóm kiểm thử quan trọng bao gồm:
-*   `tests/test_number_parser.py`: Kiểm thử bộ chuyển đổi định dạng số Việt Nam (dấu chấm ngăn nghìn, dấu phẩy thập phân, dấu ngoặc âm kế toán) để đảm bảo không bị lệch giá trị số 1000 lần.
-*   `tests/test_table_detector.py`: Kiểm tra tính năng nhận diện bảng văn bản theo các dialect khác nhau.
-*   `tests/test_submission_schema.py`: Đảm bảo cấu trúc file JSON nộp bài luôn khớp 100% với yêu cầu từ dashboard của BTC.
+### 3.2. Chạy trên Kaggle Notebook (GPU Tesla T4 16GB)
+Mở file [notebooks/pipeline_runner_kaggle.ipynb](notebooks/pipeline_runner_kaggle.ipynb) trên Kaggle:
+1. **Mục 1 (Môi trường):** Clone repo vào `/kaggle/working/R2AI-Stage-2` và cài đặt `requirements.txt`.
+2. **Mục 2 (Dữ liệu - Chọn 2.A hoặc 2.B):**
+   * **Phương án 2.A (Nạp nhanh):** Tự động xử lý cả 2 cách tải lên Kaggle Dataset:
+     - *Cách 1:* File nén `.zip.bin` (hoặc `.zip`) được giải nén tự động vào `data/`.
+     - *Cách 2:* Folder `data/` được Kaggle giải nén sẵn được đồng bộ trực tiếp vào `data/`.
+   * **Phương án 2.B (Build từ đầu):** Xây dựng toàn bộ: `fetch` $\rightarrow$ `corpus` $\rightarrow$ `index` $\rightarrow$ đóng gói `data_backup.zip` tại `/kaggle/working/`.
+3. **Mục 3 (Suy luận & Resume):** Chạy suy luận với mô hình 4-bit, tự động lưu checkpoint vào `/kaggle/working/backup/` (hoặc nhận file `questions_pred.json` upload từ máy tính để resume).
+4. **Mục 4 & 5 (Đóng gói & Đánh giá):** Đóng gói `submission.zip` tại `/kaggle/working/submission.zip` để tải trực tiếp từ giao diện Kaggle.
 
 ---
 
-## 6. Định dạng File Nộp bài (Submission Format)
-Tệp ZIP nộp bài phải chứa file kết quả `submission.json` và thư mục `data/` chứa các CSV bảng được truy cập trực tiếp ở cấp ngoài cùng:
+### 3.3. Chạy trên Máy Cá nhân (Local GPU / CPU)
+1. **Khởi tạo môi trường ảo:**
+   ```bash
+   python -m venv .venv
+   # Windows:
+   .venv\Scripts\activate
+   # Linux/macOS:
+   source .venv/bin/activate
+   ```
+2. **Cài đặt thư viện:**
+   ```bash
+   pip install --upgrade pip
+   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+   pip install -r requirements.txt
+   ```
+3. **Chạy kiểm thử hệ thống:**
+   ```bash
+   pytest tests/ -q
+   ```
+
+---
+
+## 4. Cấu hình Mô hình LLM (`configs/config.yaml`)
+
+Hệ thống cho phép chuyển đổi linh hoạt mô hình và backend suy luận tại [configs/config.yaml](file:R2AI-Stage-2/configs/config.yaml):
+
+```yaml
+llm:
+  # Cấu hình MẶC ĐỊNH cho GPU T4 (Colab / Kaggle 16GB)
+  model_id: Qwen/Qwen2.5-14B-Instruct-AWQ
+  backend: vllm                  # vllm | transformers | openai
+  base_url: http://localhost:8000/v1
+  max_tokens: 512
+  temperature: 0.0
+  quantization: awq              # awq | gptq | none (chống tràn VRAM 16GB)
+  gpu_memory_utilization: 0.90
+  max_model_len: 4096
+
+llm_local:
+  # Cấu hình MẶC ĐỊNH cho Local GPU (RTX 2050 4GB)
+  model_id: Qwen/Qwen2.5-Coder-1.5B-Instruct
+  backend: transformers
+  max_tokens: 256
+  temperature: 0.0
+  device_map: auto
+  torch_dtype: float16
+```
+
+Nếu muốn chạy suy luận qua API từ xa (OpenAI-compatible server hoặc máy chủ vLLM tự host):
+1. Đổi `llm.backend: openai` và cấu hình `llm.base_url`.
+2. Điền `LLM_API_KEY` trong file `.env`.
+
+---
+
+## 5. Hướng dẫn Vận hành Hệ thống
+
+### Cách 1: Chạy 1 Lệnh Duy nhất Toàn Chu trình (End-to-End)
+
+Chạy liên hoàn toàn bộ từ fetch data (nếu chưa có) $\rightarrow$ tạo corpus $\rightarrow$ tạo chỉ mục $\rightarrow$ suy luận LLM $\rightarrow$ đóng gói ZIP:
+```bash
+python main.py all --questions data/questions/questions.jsonl --name submission_final
+```
+
+---
+
+### Cách 2: Chạy Tuần tự Từng Giai đoạn (Scripts 00 $\rightarrow$ 05)
+
+#### Bước 0: Tải dữ liệu từ Hugging Face
+```bash
+python main.py fetch
+# hoặc: python scripts/00_fetch_data.py
+```
+
+#### Bước 1: Bóc tách, Ghép bảng gãy & Chuẩn hóa kho dữ liệu (Build Corpus)
+```bash
+python main.py corpus
+# hoặc: python scripts/01_build_corpus.py
+```
+*Tạo 119,045 bảng CSV chuẩn hóa tại `data/processed/`. Có cơ chế **Resume tự động** (tiếp tục từ doc dở dang nếu bị ngắt quãng).*
+
+#### Bước 2: Xây dựng Chỉ mục Tìm kiếm (Build Index)
+```bash
+python main.py index
+# hoặc: python scripts/02_build_index.py
+```
+*Tự động quét `data/processed/` để tạo/cập nhật `data/index/manifest.jsonl`, sau đó xây dựng chỉ mục từ khóa `data/index/bm25.pkl` và `vectors.pkl` (Dense Vectors).*
+
+#### Bước 3: Chạy Suy luận Trả lời Câu hỏi (Batch Inference & Checkpoint)
+```bash
+python main.py infer \
+# hoặc: python scripts/03_generate_answers.py \
+    --questions data/questions/questions.jsonl \
+    --model Qwen/Qwen2.5-14B-Instruct-AWQ \
+    --backend vllm \
+    --pred outputs/predictions/questions_pred.json
+```
+*Tự động lưu checkpoint mỗi 5 câu hỏi; nếu bị gián đoạn, chỉ cần chạy lại lệnh để tiếp tục.*
+
+#### Bước 4: Kiểm tra & Đóng gói File Nộp bài (Packaging)
+```bash
+# Kiểm tra hợp lệ định dạng
+python main.py package --pred outputs/predictions/questions_pred.json --check-only
+# hoặc: python scripts/04_package.py --pred outputs/predictions/questions_pred.json --check-only
+
+# Đóng gói file ZIP nộp bài
+python main.py package \
+# hoặc: python scripts/04_package.py \
+    --pred outputs/predictions/questions_pred.json \
+    --questions data/questions/questions.jsonl \
+    --name submission_vfinqa
+```
+*File nộp bài sẵn sàng tại: `outputs/submissions/submission_vfinqa.zip`.*
+
+#### Bước 5: Đánh giá Điểm Hệ thống (Evaluation trên Gold Set)
+```bash
+python main.py eval --pred outputs/predictions/questions_pred.json
+# hoặc: python scripts/05_evaluate.py --pred outputs/predictions/questions_pred.json
+```
+
+---
+
+### Cách 3: Chạy qua Jupyter Notebook
+
+Mở [notebooks/pipeline_runner_colab.ipynb](file:R2AI-Stage-2/notebooks/pipeline_runner_colab.ipynb) trên Google Colab.
+Hoặc mở [notebooks/pipeline_runner_kaggle.ipynb](file:R2AI-Stage-2/notebooks/pipeline_runner_kaggle.ipynb) trên Kaggle Notebook.
+Sau đó chạy các cell code cần thiết để tương tác trực quan và theo dõi tiến trình từng ô lệnh.
+
+---
+
+## 6. Kiểm thử Toàn diện (Testing)
+
+Hệ thống đi kèm bộ kiểm thử tự động toàn diện kiểm tra tất cả các module cốt lõi:
+```bash
+pytest tests/ -q
+```
+
+**Chi tiết các bộ test suite:**
+* `tests/test_html_table.py`: Kiểm thử trích xuất bảng HTML, sửa lỗi dính chữ/số OCR và thuật toán ghép bảng gãy qua trang (`TableStitcher`).
+* `tests/test_number_parser.py`: Kiểm thử chuyển đổi định dạng số tài chính Việt Nam (dấu chấm/phẩy, số âm ngoặc đơn, regex đơn vị tiền tệ triệu/tỷ).
+* `tests/test_hierarchical_prefix.py`: Kiểm thử thuật toán lan truyền tiền tố nhóm cha vào cột `item`.
+* `tests/test_report_type_filter.py`: Kiểm thử phân loại câu hỏi (BCTC mẹ vs hợp nhất) và bộ lọc cứng `report_type`.
+* `tests/test_selector_coverage.py`: Kiểm thử Multi-Section Coverage cho câu hỏi tính chỉ số phái sinh (ROE/ROA).
+* `tests/test_sandbox_repair.py`: Kiểm thử môi trường thực thi an toàn AST `PandasSandbox` và chẩn đoán tự sửa lỗi Self-Repair.
+* `tests/test_submission_schema.py`: Đảm bảo cấu trúc file JSON nộp bài luôn khớp 100% với yêu cầu của Ban tổ chức.
+
+---
+
+## 7. Quy chuẩn File Nộp bài (Submission Format)
+
+File `submission.zip` được đóng gói trực tiếp ở cấp ngoài cùng:
 ```
 submission.zip
 ├── submission.json
 └── data/
-    ├── <bang_1>.csv
+    ├── <bang_evidence_1>.csv
+    ├── <bang_evidence_2>.csv
     └── ...
 ```
-File `submission.json` là một danh sách, mỗi câu hỏi bắt buộc phải có đầy đủ 7 trường thông tin sau:
+
+Cấu trúc mỗi phần tử trong `submission.json`:
 ```json
 {
   "id": 1,
-  "question": "Doanh thu thuần của Công ty CP Sữa Việt Nam (VNM) năm 2023 là bao nhiêu?",
-  "answer": 63075000000.0,
-  "relevant_docs": ["VNM_financial_statements_2023_consolidated"],
-  "relevant_tables": ["VNM_financial_statements_2023_consolidated|5"],
+  "question": "Lãi tiền gửi năm 2018 của công ty mẹ CTCP Hàng không Vietjet (VJC) là bao nhiêu triệu đồng?",
+  "answer": 208253.2,
+  "relevant_docs": ["VJC_financial_statements_2018_separate"],
+  "relevant_tables": ["VJC_financial_statements_2018_separate|33"],
   "evidence": [
     {
       "variable": "df1",
-      "csv_path": "data/VNM_financial_statements_2023_consolidated_table_5.csv"
+      "csv_path": "data/VJC_financial_statements_2018_separate_table_33.csv"
     }
   ],
-  "pandas_query": "result = df1[(df1.year == 2023)]['value'].sum()"
+  "pandas_query": "sub = df1[(df1['year'] == 2018) & (df1['item'].str.contains('Lãi tiền gửi', case=False, na=False))]\nresult = float(sub['value'].iloc[0]) if not sub.empty else 0.0"
 }
 ```
 
 ---
 
-## 7. Các điểm Cần Cải tiến & Tối ưu hóa Tiếp theo (Roadmap)
+## 8. Kiến trúc Công nghệ & Tài liệu Tham khảo (Core Technologies & References)
 
-Dựa trên phân tích thiết kế hiện tại, đây là các đầu việc cần thực hiện để đạt điểm số cao hơn trên Bảng xếp hạng:
+### 8.1. Các Công nghệ & Lý do Lựa chọn
 
-1.  **Xây dựng chỉ mục Dense Vector đầy đủ**:
-    Cần chạy tạo tệp chỉ mục `vectors.pkl` thông qua mô hình `BAAI/bge-m3` để kích hoạt hoàn toàn cơ chế truy hồi ngữ nghĩa lai (Hybrid Search), tăng Recall khi câu hỏi dùng từ đồng nghĩa với bảng.
-2.  **Mở rộng Từ điển ánh xạ Chỉ tiêu (`term_mapper.py`)**:
-    Bổ sung các biến thể tên gọi chỉ tiêu tài chính thực tế của doanh nghiệp Việt Nam vào từ điển `FINANCIAL_TERMS` trong [term_mapper.py](file:///D:/work/learn/R2AI-Stage-2-main/src/normalization/term_mapper.py) để ánh xạ chuẩn xác trường `metric`.
-3.  **Tích hợp bộ lọc Hợp nhất vs Riêng lẻ (Consolidated vs Separate)**:
-    Cần bổ sung logic trích xuất thuộc tính BCTC hợp nhất hoặc riêng lẻ từ câu hỏi trong [query_analyzer.py](file:///D:/work/learn/R2AI-Stage-2-main/src/retrieval/query_analyzer.py) và biến nó thành một bộ lọc cứng (Hard Filter) theo `report_type` để tránh nhầm lẫn bảng số liệu.
-4.  **Tối ưu hóa Prompt với Few-shot**:
-    Nâng cấp prompt sinh code Pandas trong `configs/prompts/pandas_gen.txt` từ zero-shot lên few-shot (thêm 3-5 ví dụ minh họa cách viết code Pandas trên Long Schema) để LLM sinh code ổn định và chính xác hơn.
-5.  **Cải tiến Regex nhận diện Đơn vị (Unit & Scaling)**:
-    Tăng cường các regex nhận diện từ viết tắt của đơn vị tính tiền tệ (như `tr.đ`, `triệuđ`, `tỷđ`) trong [number_parser.py](file:///D:/work/learn/R2AI-Stage-2-main/src/normalization/number_parser.py) để tránh việc nhân/chia sai tỷ lệ 1,000 hoặc 1,000,000 lần.
+1. **Mô hình Ngôn ngữ Lớn (LLM) — Qwen2.5-14B-Instruct / Qwen2.5-Coder**:
+   * **Lựa chọn:** `Qwen2.5-Coder-7B-Instruct` hoặc `Qwen2.5-14B-Instruct-AWQ`.
+   * **Lý do:** Qwen2.5 hiện là dòng mô hình mã nguồn mở dưới 14B có khả năng suy luận logic, hiểu cấu trúc bảng biểu và sinh mã Python/Pandas mạnh và đáp ứng yêu cầu của cuộc thi. Model 14B thì bản lượng tử hóa 4-bit AWQ giúp mô hình 14B chạy được trên 16GB VRAM GPU T4 nhưng vẫn còn hạn chế, cần tùy chỉnh thêm nhiều thông số bổ sung để hoạt động tối ưu. Còn model 7B thì cũng cần phải lượng tử hóa 4-bit với bitsandbytes để chạy được với 16GB VRAM GPU T4 (bản thường 16-bit vẫn chiếm dụng tới ~14GB VRAM).
+2. **Backend Suy luận — Hugging Face Transformers & AutoAWQ**:
+   * **Lựa chọn:** `transformers` với `autoawq` / `gptqmodel`.
+   * **Lý do:** Chạy đồng bộ trực tiếp trong tiến trình chính, tương thích trên cả Windows, Linux và Google Colab. Tránh được các lỗi xung đột CUDA context và deadlock IPC của các runtime multiprocessing trên GPU T4.
+3. **Mô hình Nhúng Vector Đa ngữ — BAAI/bge-m3 & FAISS**:
+   * **Lựa chọn:** `BAAI/bge-m3` kết hợp `FAISS (IndexFlatIP)`.
+   * **Lý do:** BGE-M3 hỗ trợ hơn 100 ngôn ngữ với khả năng biểu diễn ngữ nghĩa tiếng Việt tài chính sâu sắc, nhận diện mối quan hệ giữa từ ngữ câu hỏi và thẻ mô tả bảng (Table Card). FAISS cho phép tìm kiếm độ tương đồng Cosine (Inner Product sau chuẩn hóa) trên 119,000 vector chiều 1024 chỉ trong vài mili-giây.
+4. **Hợp nhất Chỉ mục Lai — BM25Okapi + Reciprocal Rank Fusion (RRF)**:
+   * **Lựa chọn:** `BM25Okapi` (từ khóa chính xác: mã ticker, năm, chỉ tiêu) + `Dense Vector` (ngữ nghĩa) $\rightarrow$ `RRF (k=60)`.
+   * **Lý do:** BM25 bắt chính xác các từ khóa số và tên mã chứng khoán viết tắt; Dense vector bắt các từ đồng nghĩa tài chính. RRF hợp nhất hai bảng xếp hạng một cách phi tham số, đạt điểm **Recall F2 tối đa** mà không bị lệch trọng số.
+5. **Môi trường Thực thi An toàn Sandbox AST & Self-Repair Loop**:
+   * **Lựa chọn:** `PandasSandbox` (kiểm tra cây cú pháp trừu tượng AST) + `SelfRepairExecutor`.
+   * **Lý do:** Ngăn chặn tuyệt đối các lệnh nguy hiểm (file I/O, network, shell). Khi code Pandas gặp lỗi runtime (`KeyError`, `IndexError`), traceback và schema bảng được phản hồi ngược lại LLM để tự sửa lỗi (tối đa 3 lần), nâng cao tỷ lệ sinh câu trả lời thành công.
+6. **Bộ Chuẩn hóa Đơn vị Tài chính Tự động (Financial Unit Auto-Scaling)**:
+   * **Lý do:** Đề thi hỏi bằng nhiều đơn vị khác nhau (*tỷ đồng, triệu đồng, nghìn đồng, USD, %*). Module tự động phát hiện đơn vị trong câu hỏi và đơn vị gốc của bảng để áp dụng hệ số nhân chuẩn hóa ($10^9, 10^6, 10^3$) trước khi trả lời.
+
+---
+
+### 8.2. Tài liệu Tham khảo (References)
+
+* **Qwen2.5 Technical Report**: Yang, A., et al. (2024). *Qwen2.5 Technical Report*. [arXiv:2412.15115](https://arxiv.org/abs/2412.15115).
+* **BGE-M3 (Multilingual Embedding)**: Chen, J., et al. (2024). *BGE M3-Embedding: Multi-Lingual, Multi-Functionality, Multi-Granularity Text Embeddings Through Self-Knowledge Distillation*. [arXiv:2402.03216](https://arxiv.org/abs/2402.03216).
+* **AWQ: Activation-aware Weight Quantization**: Lin, J., et al. (2023). *AWQ: Activation-aware Weight Quantization for On-Device LLM Compression and Acceleration*. [arXiv:2306.00978](https://arxiv.org/abs/2306.00978).
+* **Reciprocal Rank Fusion (RRF)**: Cormack, G. V., Clarke, C. L., & Buettcher, S. (2009). *Reciprocal rank fusion outperformsres ranking methods*. In Proceedings of the 32nd international ACM SIGIR conference on Research and development in information retrieval (pp. 868-869).
+* **FAISS (Billion-scale Similarity Search)**: Johnson, J., Douze, M., & Jégou, H. (2019). *Billion-scale similarity search with GPUs*. IEEE Transactions on Big Data, 7(3), 535-547.
+* **BM25Okapi**: Robertson, S. E., & Zaragoza, H. (2009). *The Probabilistic Relevance Framework: BM25 and Beyond*. Foundations and Trends in Information Retrieval, 3(4), 333-389.
+
+---
+
+## Bạn có thể lấy dataset đã build sẵn tại:
+* File `.zip.bin`:
+https://www.kaggle.com/datasets/anhtu25/s2-backup
+
+* Dataset đã unzip:
+https://www.kaggle.com/datasets/anhtu25/r2ai-s2-backup
