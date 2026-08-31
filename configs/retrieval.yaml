@@ -20,7 +20,7 @@ hybrid:
   rrf_k: 60
   weight_bm25: 0.5
   weight_dense: 0.5
-  candidate_top_k: 120           # truoc khi rerank
+  candidate_top_k: 150           # truoc khi rerank
 
 rerank:
   enabled: false
@@ -31,7 +31,7 @@ selector:
   # F2 uu tien recall gap 4 lan precision -> chon rong tay hon truc giac
   strategy: adaptive             # fixed | adaptive | topk
   min_tables: 2
-  max_tables: 16
+  max_tables: 24
   score_ratio_threshold: 0.35    # giu bang co score >= ratio * score_cao_nhat
 
 hard_filters:

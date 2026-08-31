@@ -143,15 +143,27 @@ class TableDetector:
         out: list[ExtractedTable] = []
         for tb in tables:
             ctx = tb.context_before
+            section = self._detect_section(ctx)
+            # Neu la bang noi tiep va chua co section, ke thua tu bang truoc
+            if tb.is_continuation and not section and out:
+                section = out[-1].section
+            title = self._title_from_context(ctx)
+            if tb.is_continuation and not title and out:
+                title = out[-1].title
+
             out.append(
                 ExtractedTable(
                     doc_id=doc.doc_id,
                     position=tb.position,
-                    title=self._title_from_context(ctx),
+                    title=title,
                     rows=tb.rows,
                     page=tb.page,
-                    section=self._detect_section(ctx),
+                    section=section,
                     context_before=ctx,
+                    is_continuation=tb.is_continuation,
+                    group_id=tb.group_id,
+                    parent_table_ref=f"{doc.doc_id}|{tb.parent_position}" if tb.parent_position else None,
+                    next_table_ref=f"{doc.doc_id}|{tb.next_position}" if tb.next_position else None,
                 )
             )
         return out

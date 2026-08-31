@@ -37,6 +37,10 @@ class TableMeta:
     card: str = ""
     columns: list[str] | None = None
     n_rows: int = 0
+    is_continuation: bool = False
+    group_id: str | None = None
+    parent_table_ref: str | None = None
+    next_table_ref: str | None = None
 
 
 class MetadataStore:
@@ -61,7 +65,7 @@ class MetadataStore:
 
         log.info("Dang quet %d file CSV trong %s de tao manifest.jsonl...", len(csv_files), p_dir)
         rows: list[dict] = []
-        pattern = re.compile(r"^(.*)_table_(\d+)\.csv$")
+        pattern = re.compile(r"^(.*)_table_(?:L)?(\d+)\.csv$")
 
         for f in csv_files:
             m = pattern.match(f.name)
@@ -92,7 +96,7 @@ class MetadataStore:
 
             # Tao the card co ban giau tin hieu tim kiem
             items_desc = f". Chi tiêu: {', '.join(items)}" if items else ""
-            card = f"Bang so {pos} trong BCTC {ticker or ''} nam {year or ''} ({report_type or ''}){items_desc}. Cot: {', '.join(cols[:8])}"
+            card = f"Bang dong {pos} trong BCTC {ticker or ''} nam {year or ''} ({report_type or ''}){items_desc}. Cot: {', '.join(cols[:8])}"
 
             rows.append({
                 "table_ref": table_ref,
@@ -109,6 +113,10 @@ class MetadataStore:
                 "card": card,
                 "columns": cols,
                 "n_rows": 0,
+                "is_continuation": False,
+                "group_id": None,
+                "parent_table_ref": None,
+                "next_table_ref": None,
             })
 
         from ..utils.io import write_jsonl_atomic
@@ -149,6 +157,10 @@ class MetadataStore:
                 card=row.get("card", "") or "",
                 columns=row.get("columns"),
                 n_rows=int(row.get("n_rows", 0)),
+                is_continuation=bool(row.get("is_continuation", False)),
+                group_id=row.get("group_id"),
+                parent_table_ref=row.get("parent_table_ref"),
+                next_table_ref=row.get("next_table_ref"),
             )
             for row in rows
         }

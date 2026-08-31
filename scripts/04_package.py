@@ -21,21 +21,33 @@ from src.utils.io import read_json
 
 
 def to_items(rows: list[dict]) -> list[SubmissionItem]:
-    return [
-        SubmissionItem(
-            id=int(r["id"]),
-            question=str(r.get("question", "")),
-            answer=float(r.get("answer") or 0.0),
-            relevant_docs=list(r.get("relevant_docs") or []),
-            relevant_tables=list(r.get("relevant_tables") or []),
-            evidence=[
-                Evidence(variable=str(e["variable"]), csv_path=str(e["csv_path"]))
-                for e in (r.get("evidence") or [])
-            ],
-            pandas_query=str(r.get("pandas_query") or ""),
+    out = []
+    for r in rows:
+        evidence_list = []
+        if r.get("evidence"):
+            for e in r["evidence"]:
+                evidence_list.append(
+                    Evidence(variable=str(e["variable"]), csv_path=str(e["csv_path"]))
+                )
+        elif r.get("candidate_tables"):
+            for i, t in enumerate(r["candidate_tables"][:4], start=1):
+                if t.get("csv_path"):
+                    evidence_list.append(
+                        Evidence(variable=f"df{i}", csv_path=str(t["csv_path"]))
+                    )
+
+        out.append(
+            SubmissionItem(
+                id=int(r["id"]),
+                question=str(r.get("question", "")),
+                answer=float(r.get("answer") or 0.0),
+                relevant_docs=list(r.get("relevant_docs") or []),
+                relevant_tables=list(r.get("relevant_tables") or []),
+                evidence=evidence_list,
+                pandas_query=str(r.get("pandas_query") or ""),
+            )
         )
-        for r in rows
-    ]
+    return out
 
 
 def main() -> int:

@@ -73,6 +73,10 @@ class ExtractedTable:
     context_before: str = ""           # vai dong truoc bang — giup section/unit detection
     df: pd.DataFrame | None = None     # dien o buoc normalization
     csv_path: str | None = None        # duong dan tuong doi "data/xxx.csv"
+    is_continuation: bool = False      # True neu la bang noi tiep qua trang
+    group_id: str | None = None        # Ma dinh danh nhom cac bang can gop
+    parent_table_ref: str | None = None # Tham chieu den bang goc (chua header)
+    next_table_ref: str | None = None  # Tham chieu den bang tiep theo trong chuoi
 
     @property
     def table_ref(self) -> str:
@@ -129,6 +133,10 @@ class RetrievedTable:
     bm25_score: float = 0.0
     dense_score: float = 0.0
     rerank_score: float | None = None
+    is_continuation: bool = False
+    group_id: str | None = None
+    parent_table_ref: str | None = None
+    next_table_ref: str | None = None
 
 
 @dataclass(slots=True)

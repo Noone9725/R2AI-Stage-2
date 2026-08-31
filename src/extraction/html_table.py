@@ -86,6 +86,10 @@ class HtmlTable:
     page: int | None = None
     context_before: str = ""
     n_cols: int = field(default=0)
+    is_continuation: bool = False
+    group_id: str | None = None
+    parent_position: int | None = None
+    next_position: int | None = None
 
     def __post_init__(self) -> None:
         self.n_cols = max((len(r) for r in self.rows), default=0)
@@ -193,33 +197,29 @@ def _context_before(text: str, start: int, chars: int) -> str:
     return "\n".join(ln for ln in lines if ln)
 
 
-def stitch_consecutive_tables(tables: list[HtmlTable], text: str) -> list[HtmlTable]:
-    """Ghep cac bang HTML bi be gay qua ranh gioi trang (Fractured Tables).
-
-    Dieu kien:
-      1. Hai bang lien tiep co cung so cot (n_cols).
-      2. Doan text xen giua chi la whitespace hoac marker ===== PAGE N ===== (khong co doan van).
+def link_consecutive_tables(tables: list[HtmlTable], text: str) -> list[HtmlTable]:
+    """Lien ket cac bang HTML bi be gay qua ranh gioi trang (Fractured Tables)
+    nhung GIU NGUYEN tung bang doc lap theo dung quy cach BTC.
     """
     if len(tables) < 2:
         return tables
 
-    stitched: list[HtmlTable] = []
-    i = 0
-    while i < len(tables):
+    for i in range(len(tables) - 1):
         curr = tables[i]
-        while i + 1 < len(tables):
-            nxt = tables[i + 1]
-            gap = text[curr.char_end : nxt.char_start]
-            gap_clean = _PAGE_RE.sub("", _TAG_RE.sub("", gap)).strip()
-            if len(gap_clean) < 30 and nxt.n_cols == curr.n_cols:
-                curr.rows.extend(nxt.rows)
-                curr.char_end = nxt.char_end
-                i += 1
-            else:
-                break
-        stitched.append(curr)
-        i += 1
-    return stitched
+        nxt = tables[i + 1]
+        gap = text[curr.char_end : nxt.char_start]
+        gap_clean = _PAGE_RE.sub("", _TAG_RE.sub("", gap)).strip()
+        if len(gap_clean) < 30 and nxt.n_cols == curr.n_cols:
+            grp = curr.group_id or f"grp_{curr.position}"
+            curr.group_id = grp
+            nxt.group_id = grp
+            nxt.is_continuation = True
+            nxt.parent_position = curr.parent_position or curr.position
+            curr.next_position = nxt.position
+            if not nxt.context_before and curr.context_before:
+                nxt.context_before = curr.context_before
+
+    return tables
 
 
 def extract_html_tables(
@@ -228,24 +228,23 @@ def extract_html_tables(
     min_rows: int = 2,
     min_cols: int = 2,
     context_chars: int = 400,
-    stitch: bool = True,
+    link_tables: bool = True,
 ) -> list[HtmlTable]:
     """Tim moi the <table> trong van ban, tra ve theo thu tu xuat hien.
 
-    `position` bat dau tu 1 va la vi tri bang trong bao cao — dung truc tiep
-    cho `relevant_tables` dang "<doc_id>|<position>".
+    `position` la vi tri dong bat dau cua the <table> trong file OCR .txt goc
+    (1-indexed), dung 100% dung dinh dang `relevant_tables` dang "<doc_id>|<position>".
     """
     pages = _page_index(text)
     out: list[HtmlTable] = []
-    position = 0
     for m in _TABLE_RE.finditer(text):
-        position += 1
+        line_no = text[: m.start()].count("\n") + 1
         rows = _parse_rows(m.group(1))
         if len(rows) < min_rows or max((len(r) for r in rows), default=0) < min_cols:
             continue
         out.append(
             HtmlTable(
-                position=position,
+                position=line_no,
                 rows=rows,
                 char_start=m.start(),
                 char_end=m.end(),
@@ -254,8 +253,8 @@ def extract_html_tables(
             )
         )
 
-    if stitch and len(out) > 1:
-        out = stitch_consecutive_tables(out, text)
+    if link_tables and len(out) > 1:
+        out = link_consecutive_tables(out, text)
 
     return out
 

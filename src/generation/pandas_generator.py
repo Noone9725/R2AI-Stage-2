@@ -35,7 +35,7 @@ class PandasGenerator:
         """Tra ve ({var: df}, {var: csv_path}).
 
         Bang khong doc duoc thi bo qua chu khong ra loi.
-        Neu la cau hoi don le (1 cong ty, 1 nam, khong phai chi so phai sinh) -> nap dung 1 bang tot nhat (df1) de tranh LLM cong don nhieu bang.
+        Neu la cau hoi don le -> uu tien top 1 hoac toan bo cac bang trong cung group_id cua bang top 1.
         """
         frames: dict[str, pd.DataFrame] = {}
         var_to_csv: dict[str, str] = {}
@@ -46,9 +46,21 @@ class PandasGenerator:
             and len(question.tickers) <= 1
             and len(question.years) <= 1
         )
-        table_limit = 1 if is_single else (max_tables or len(retrieval.tables))
+        
+        tables_to_load = retrieval.tables
+        if is_single and retrieval.tables:
+            top_t = retrieval.tables[0]
+            if top_t.group_id:
+                # Lay tat ca cac bang trong cung group_id
+                tables_to_load = [t for t in retrieval.tables if t.group_id == top_t.group_id]
+                if not tables_to_load:
+                    tables_to_load = [top_t]
+            else:
+                tables_to_load = [top_t]
+        elif max_tables:
+            tables_to_load = retrieval.tables[:max_tables]
 
-        for i, table in enumerate(retrieval.tables[:table_limit], start=1):
+        for i, table in enumerate(tables_to_load, start=1):
             if not table.csv_path:
                 continue
             local = self.csv.resolve_local(table.csv_path)
@@ -57,6 +69,9 @@ class PandasGenerator:
             except Exception as exc:  # noqa: BLE001
                 log.warning("Khong doc duoc %s: %s", local, exc)
                 continue
+            # Ghi kem thong tin group_id vao DataFrame neu co
+            if table.group_id:
+                df["group_id"] = table.group_id
             var = f"df{i}"
             frames[var] = df
             var_to_csv[var] = table.csv_path
@@ -81,6 +96,7 @@ class PandasGenerator:
                 reasoning="khong nap duoc bang nao", attempt=0, raw_response="",
             )
 
+        asked_unit = getattr(question, "asked_unit", "none")
         prompt = pt.render(
             "pandas_gen",
             question=question.question,
@@ -88,6 +104,8 @@ class PandasGenerator:
             schemas=pt.format_schemas(frames, question_text=question.question),
             formulas=pt.format_formulas(question.metrics),
             period_hint=pt.format_period_hint(question),
+            linked_tables_note=pt.format_linked_tables_note(frames),
+            unit_rounding_hint=pt.format_unit_and_rounding_guidelines(question.question, asked_unit=asked_unit),
             item_anchors=pt.format_item_anchors(frames, question.question, metrics=question.metrics),
         )
 

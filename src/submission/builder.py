@@ -44,32 +44,15 @@ class SubmissionBuilder:
     ) -> SubmissionItem:
         answer = self.fallback
         if execution is not None and execution.success and execution.value is not None:
-            asked = self._asked_unit(question)
-            source_unit = None
-            if retrieval.tables:
-                top_tbl = retrieval.tables[0]
-                card_low = (top_tbl.card or "").lower()
-                tbl_unit = (getattr(top_tbl, "unit", "") or "").lower()
-                if "trieu_dong" in tbl_unit or "triệu đồng" in card_low or "don vi: trieu" in card_low:
-                    source_unit = "trieu_dong"
-                elif "ty_dong" in tbl_unit or "tỷ đồng" in card_low or "don vi: ty" in card_low:
-                    source_unit = "ty_dong"
-                elif "percent" in tbl_unit or "%" in card_low:
-                    source_unit = "percent"
-
-            is_fin_inst = any(
-                b in question.question
-                for b in ("BID", "SHB", "STB", "ACB", "CTG", "VCB", "TCB", "MBB", "VIB", "VPB", "TPB", "HDB", "MSB", "LPB", "FTS", "SSI", "VND", "HCM")
-            )
-
             raw_f = float(execution.value)
-            norm = self.units.apply(raw_f, asked, source_unit=source_unit, is_fin_inst=is_fin_inst)
-            answer = norm.value
-            if norm.converted:
-                log.debug(
-                    "Q%d doi don vi: %s / %g -> %s (%s | src=%s)",
-                    question.id, norm.raw_value, norm.divisor, norm.value, asked.value, source_unit,
-                )
+            # Uu tien gia tri tinh toan truc tiep tu ma pandas da duoc lam tron
+            # Neu so qua lon (>= 10^11) va cau hoi hoi ty/trieu thi normalizer ho tro du phong
+            asked = self._asked_unit(question)
+            if raw_f >= 1e11 and asked in (AskedUnit.TRIEU_DONG, AskedUnit.TY_DONG):
+                norm = self.units.apply(raw_f, asked)
+                answer = norm.value
+            else:
+                answer = round(raw_f, self.round_to)
         else:
             log.debug(
                 "Q%d dung fallback (%s)",

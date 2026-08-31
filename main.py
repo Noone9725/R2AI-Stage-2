@@ -107,6 +107,45 @@ def stage_infer(args, settings) -> Path:
     return out
 
 
+def stage_retrieve(args, settings) -> Path:
+    q_path = _questions_path(settings, args.questions)
+    out = Path(args.out) if args.out else (
+        Path(args.pred) if args.pred else settings.paths.outputs / "retrieval" / "retrieval_results.json"
+    )
+    out.parent.mkdir(parents=True, exist_ok=True)
+
+    from src.pipeline import RetrievalPipeline
+    pipeline = RetrievalPipeline()
+    pipeline.run(questions_path=q_path, out_path=out, limit=args.limit)
+    print(f"[retrieve] Da xu ly xong -> {out}")
+    return out
+
+
+def stage_generate(args, settings) -> Path:
+    r_path = Path(args.retrieval) if getattr(args, "retrieval", None) else settings.paths.outputs / "retrieval" / "retrieval_results.json"
+    if not r_path.exists():
+        print(f"[generate] Khong tim thay file retrieval: {r_path}. Hay chay stage retrieve truoc!")
+        sys.exit(1)
+
+    out = Path(args.out) if args.out else (
+        Path(args.pred) if args.pred else settings.paths.outputs / "predictions" / "final_results.json"
+    )
+    out.parent.mkdir(parents=True, exist_ok=True)
+
+    llm = LLMClient(model_id=args.model, backend=args.backend)
+    pipeline = AnswerPipeline(llm=llm, load_index=False)
+    items = pipeline.run_from_retrieval(
+        retrieval_path=r_path,
+        out_path=out,
+        checkpoint_path=out,
+        save_every=5,
+        resume=not getattr(args, "no_resume", False),
+        limit=args.limit,
+    )
+    print(f"[generate] {len(items)} cau -> {out}")
+    return out
+
+
 def stage_package(args, settings, pred_path: Path | None = None) -> None:
     from importlib import import_module
 
@@ -161,7 +200,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="R2AI Stage 2 pipeline")
     parser.add_argument(
         "stage",
-        choices=["fetch", "corpus", "index", "infer", "package", "eval", "evaluate", "verify", "all"],
+        choices=["fetch", "corpus", "index", "infer", "retrieve", "generate", "package", "eval", "evaluate", "verify", "all"],
         help="Stage can chay",
     )
     parser.add_argument("--fetch", action="store_true", help="Tu dong fetch data tu HuggingFace truoc khi chay")
@@ -169,6 +208,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rebuild-manifest", action="store_true", help="Tu dong scan va tao lai manifest.jsonl tu data/processed/")
     parser.add_argument("--questions", default=None)
     parser.add_argument("--pred", default=None)
+    parser.add_argument("--retrieval", default=None, help="Duong dan file retrieval trung gian cho generate")
     parser.add_argument("--gold", default=None, help="Duong dan file gold labels JSON")
     parser.add_argument("--name", default="submission")
     parser.add_argument("--out", default=None, help="Duong dan file dau ra (ZIP hoac JSON report)")
@@ -194,6 +234,10 @@ def main() -> int:
         stage_index(args, settings)
     elif args.stage == "infer":
         stage_infer(args, settings)
+    elif args.stage == "retrieve":
+        stage_retrieve(args, settings)
+    elif args.stage == "generate":
+        stage_generate(args, settings)
     elif args.stage == "package":
         if not args.pred:
             print("package can --pred")

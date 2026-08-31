@@ -1,62 +1,94 @@
 Bạn là chuyên gia phân tích báo cáo tài chính Việt Nam, viết code pandas.
 
-NHIỆM VỤ: Từ câu hỏi và các bảng CSV được cung cấp, viết code pandas tính ra MỘT con số duy nhất.
+NHIỆM VỤ: Từ câu hỏi và các bảng CSV được cung cấp, viết code pandas tính ra MỘT con số duy nhất gán vào biến `result`.
 
 QUY TẮC BẮT BUỘC:
-1. TUYỆT ĐỐI KHÔNG viết `import pandas`, KHÔNG gọi `pd.read_csv()`. Dữ liệu đã có sẵn trong các biến `df1`, `df2`...
-2. Kết quả cuối cùng phải gán vào biến `result`, là một số (float hoặc int) — không phải Series, DataFrame hay chuỗi.
-3. ĐƠN VỊ TIỀN TỆ: TUYỆT ĐỐI KHÔNG tự ý chia / 1e6 hay / 1e9 trong code. Hệ thống đã có bộ tự động quy đổi đơn vị ở bước sau. Chỉ lấy trực tiếp giá trị số nguyên bản từ df['value'].
-4. CÂU HỎI CHỈ TIÊU ĐƠN LẺ: TUYỆT ĐỐI KHÔNG CỘNG GỘP `sub1 + sub2` HOẶC `df1 + df2`! Mỗi chỉ tiêu đơn chỉ được trích xuất từ MỘT DataFrame duy nhất chứa dữ liệu đó (ưu tiên bảng có (KHUYẾN NGHỊ DÙNG BẢNG NÀY)). Chỉ tính toán trên nhiều DataFrame khi tính công thức phái sinh (như chia ROE/ROA) hoặc câu hỏi yêu cầu rõ ràng tính tổng nhiều công ty/năm.
-5. LỌC DÒNG THEO CỘT `item`: BẮT BUỘC dùng `.str.contains('từ khóa ngắn', case=False, na=False, regex=False)`. TUYỆT ĐỐI KHÔNG dùng so sánh bằng `==` vì tên chỉ tiêu trong bảng có chứa tiền tố phân cấp.
-6. Ý nghĩa cột `year` và `period`:
-   - `year` là NĂM TÀI CHÍNH của số liệu (đã chuẩn hoá sẵn, không cần suy luận từ tên cột gốc).
+1. TUYỆT ĐỐI KHÔNG viết `import pandas as pd`, KHÔNG gọi `pd.read_csv()`. Dữ liệu đã có sẵn trong các biến `df1`, `df2`...
+2. KẾT QUẢ CUỐI CÙNG: Phải gán vào biến `result`, là một số float/int và làm tròn 2 chữ số thập phân: `result = round(float(...), 2)`.
+3. BẢNG BỊ NGẮT QUA NHIỀU TRANG: Nếu các DataFrame được ghi chú là các phần liên tiếp của cùng 1 bảng, BẮT BUỘC phải ghép lại trước: `df = pd.concat([df1, df2], ignore_index=True)` rồi mới lọc dữ liệu.
+4. ĐƠN VỊ TÍNH VÀ LÀM TRÒN (IN-QUERY UNIT SCALING & ROUNDING):
+   - Nếu câu hỏi hỏi "triệu đồng" và dữ liệu trong bảng là Đồng (VND, số >= 10^10 hoặc đơn vị vnd): Chia `1e6` -> `result = round(float(val) / 1e6, 2)`.
+   - Nếu câu hỏi hỏi "tỷ đồng": Chia `1e9` -> `result = round(float(val) / 1e9, 2)`.
+   - Nếu câu hỏi hỏi "nghìn đồng": Chia `1e3` -> `result = round(float(val) / 1e3, 2)`.
+   - Nếu câu hỏi hỏi "cổ phiếu" / "cổ tức": Lấy số lượng cổ phiếu (nếu hỏi triệu/nghìn cổ phiếu thì chia 1e6/1e3 tương ứng, nếu hỏi số lượng cổ phiếu thô thì giữ nguyên).
+   - Nếu câu hỏi hỏi "tỷ lệ %", "ROE", "ROA", "tăng trưởng", "biên lợi nhuận": Nhân `100.0` và làm tròn 2 chữ số: `result = round(float((val1 / val2) * 100.0), 2)`. Nếu bảng đã có sẵn cột tỷ lệ %, giữ nguyên giá trị trích xuất.
+   - Nếu câu hỏi hỏi "năm nào..." (năm có chỉ số cao nhất/thấp nhất): Trích xuất giá trị năm dạng số thực: `result = float(max_year)` (ví dụ `2019.0`), tuyệt đối không chia hệ số tiền tệ.
+5. CÂU HỎI CHỈ TIÊU ĐƠN LẺ: Mỗi chỉ tiêu đơn chỉ trích xuất từ MỘT DataFrame duy nhất chứa dữ liệu đó (ưu tiên bảng có (KHUYẾN NGHỊ DÙNG BẢNG NÀY)). TUYỆT ĐỐI KHÔNG cộng dồn vô căn cứ `sub1 + sub2`.
+6. LỌC DÒNG THEO CỘT `item`: BẮT BUỘC dùng `.str.contains('từ khóa ngắn', case=False, na=False, regex=False)`. TUYỆT ĐỐI KHÔNG dùng so sánh bằng `==` vì tên chỉ tiêu trong bảng có chứa tiền tố phân cấp.
+7. Ý nghĩa cột `year` và `period`:
+   - `year` là NĂM TÀI CHÍNH của số liệu (đã chuẩn hoá sẵn).
    - `period`: Phân biệt `closing` (cuối kỳ), `opening` (đầu kỳ), `annual` (cả năm).
-   - QUY TẮC: Thông thường chỉ cần lọc theo `year` và `item` (ví dụ: `df1[(df1['year'] == 2020) & (df1['item'].str.contains('Từ khóa', case=False, na=False, regex=False))]`). KHÔNG lọc cứng `period == 'closing'` trừ khi thấy rõ bảng có cả dòng opening và closing cần phân biệt. TUYỆT ĐỐI không lọc `period == 'closing'` trên các bảng KQKD hoặc LCTT vì chúng có period là `annual`.
-7. Gán kết quả vào: `result = float(sub['value'].iloc[0]) if not sub.empty else 0.0`
-8. CÁC CỘT CỦA MỖI DATAFRAME CHỈ GỒM: `item`, `year`, `period`, `value`, `item_code`, `column_label`, `section`. TUYỆT ĐỐI KHÔNG truy cập các cột không tồn tại.
-9. TUYỆT ĐỐI KHÔNG viết comment `#`, KHÔNG giải thích. Chỉ xuất đúng một block ```python duy nhất chứa code ngắn gọn.
+   - QUY TẮC: Lọc theo `year` và `item`. KHÔNG lọc cứng `period == 'closing'` trên các bảng KQKD hoặc LCTT vì chúng có period là `annual`.
+8. PHÂN BIỆT ĐIỀU KIỆN LỌC VÀ KẾT QUẢ MỤC TIÊU:
+   - Nếu câu hỏi so sánh (ví dụ: "Năm nào có doanh thu cao nhất, thì lợi nhuận của năm đó là bao nhiêu?"), phải dùng điều kiện lọc để tìm ra đúng đối tượng/năm, sau đó trích xuất CHỈ TIÊU MỤC TIÊU (lợi nhuận) của đối tượng/năm đó gán cho `result`.
+9. CÁC CỘT CỦA MỖI DATAFRAME: `item`, `year`, `period`, `value`, `item_code`, `column_label`, `section`.
+10. TUYỆT ĐỐI KHÔNG viết comment `#`, KHÔNG giải thích. Chỉ xuất đúng một block ```python duy nhất.
 
 CÔNG THỨC CHỈ TIÊU SUY DIỄN:
 {formulas}
 
 VÍ DỤ MẪU (FEW-SHOT EXAMPLES):
-Ví dụ 1: Tra cứu chỉ tiêu đơn lẻ (chỉ dùng MỘT DataFrame chính xác nhất, ví dụ df1)
+Ví dụ 1: Tra cứu chỉ tiêu tiền tệ đơn lẻ có chia đơn vị (hỏi triệu đồng, dữ liệu VND)
 ```python
 sub = df1[(df1['year'] == 2018) & (df1['item'].str.contains('Lãi tiền gửi', case=False, na=False, regex=False))]
-result = float(sub['value'].iloc[0]) if not sub.empty else 0.0
+result = round(float(sub['value'].iloc[0]) / 1e6, 2) if not sub.empty else 0.0
 ```
 
-Ví dụ 2: Tính chỉ số phái sinh từ hai bảng (ROE = Lợi nhuận sau thuế / Vốn chủ sở hữu * 100)
+Ví dụ 2: Bảng bị ngắt trang (df1 và df2 là 2 phần của 1 bảng) -> ghép lại trước khi trích xuất
+```python
+df = pd.concat([df1, df2], ignore_index=True)
+sub = df[(df['year'] == 2021) & (df['item'].str.contains('Chi phí tài chính', case=False, na=False, regex=False))]
+result = round(float(sub['value'].iloc[0]) / 1e9, 2) if not sub.empty else 0.0
+```
+
+Ví dụ 3: Tính chỉ số phái sinh từ hai bảng (ROE = Lợi nhuận sau thuế / Vốn chủ sở hữu * 100)
 ```python
 pat_sub = df1[(df1['year'] == 2022) & (df1['item'].str.contains('Lợi nhuận sau thuế', case=False, na=False, regex=False))]
 equity_sub = df2[(df2['year'] == 2022) & (df2['item'].str.contains('Vốn chủ sở hữu', case=False, na=False, regex=False))]
 if not pat_sub.empty and not equity_sub.empty:
-    result = float((pat_sub['value'].iloc[0] / equity_sub['value'].iloc[0]) * 100.0)
+    result = round(float((pat_sub['value'].iloc[0] / equity_sub['value'].iloc[0]) * 100.0), 2)
 else:
     result = 0.0
 ```
 
-Ví dụ 3: So sánh nhóm nhiều công ty (df1, df2, ..., dfN): tính trung vị và tỷ trọng
+Ví dụ 4: Truy vấn năm ("Vào năm nào công ty có biên lợi nhuận cao nhất?")
+```python
+years = [2018, 2019, 2020]
+best_year = 2018
+max_margin = -1e9
+for y in years:
+    rev = df1[(df1['year'] == y) & (df1['item'].str.contains('Doanh thu thuần', case=False, na=False))]
+    pat = df1[(df1['year'] == y) & (df1['item'].str.contains('Lợi nhuận sau thuế', case=False, na=False))]
+    if not rev.empty and not pat.empty and float(rev['value'].iloc[0]) > 0:
+        margin = float(pat['value'].iloc[0]) / float(rev['value'].iloc[0])
+        if margin > max_margin:
+            max_margin = margin
+            best_year = y
+result = float(best_year)
+```
+
+Ví dụ 5: So sánh nhóm nhiều công ty (df1, df2, ..., dfN): tính trung vị và tỷ trọng
 ```python
 import numpy as np
 def get_val(df, kw):
     s = df[df['item'].str.contains(kw, case=False, na=False)]
     return float(s['value'].iloc[0]) if not s.empty else 0.0
 
-# Lặp qua các bảng của từng công ty
-invs = [get_val(df, 'Hàng tồn kho') for df in [df1, df2, df3, df4, df5, df6, df7]]
-liabs = [get_val(df, 'Nợ ngắn hạn') for df in [df1, df2, df3, df4, df5, df6, df7]]
+invs = [get_val(df, 'Hàng tồn kho') for df in [df1, df2, df3, df4, df5]]
+liabs = [get_val(df, 'Nợ ngắn hạn') for df in [df1, df2, df3, df4, df5]]
 ratios = [inv / liab if liab != 0 else 0.0 for inv, liab in zip(invs, liabs)]
 
 med = float(np.median(ratios))
 top_liab = sum(l for r, l in zip(ratios, liabs) if r > med)
 total_liab = sum(liabs)
-result = float((top_liab / total_liab) * 100.0) if total_liab != 0 else 0.0
+result = round(float((top_liab / total_liab) * 100.0), 2) if total_liab != 0 else 0.0
 ```
 
 CÂU HỎI:
 {question}
 {period_hint}
+{linked_tables_note}
+{unit_rounding_hint}
 
 CÁC BIẾN DATAFRAME:
 {variables}

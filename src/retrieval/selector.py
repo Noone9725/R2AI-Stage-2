@@ -274,7 +274,41 @@ class TableSelector:
                             if cand.section == req_sec:
                                 chosen.append(cand)
                                 picked.add(cand.table_ref)
-                                have_sections.add(req_sec)
-                                break
+        # 4. Linked Retrieval: Tu dong keo tron bo chuoi bang noi tiep (cung group_id)
+        chosen = self._link_continuation_tables(chosen, pool)
 
         return chosen[: self.max_tables]
+
+    def _link_continuation_tables(
+        self, chosen: list[RetrievedTable], pool: list[RetrievedTable]
+    ) -> list[RetrievedTable]:
+        """Linked Retrieval: Tu dong keo tron bo chuoi bang noi tiep (group_id)
+        cua cac bang da duoc chon vao tap ung vien nop bai.
+        """
+        picked = {t.table_ref for t in chosen}
+        linked_chosen = list(chosen)
+
+        for t in chosen:
+            if not t.group_id and not t.parent_table_ref and not t.next_table_ref:
+                continue
+
+            for cand in pool:
+                if cand.table_ref in picked:
+                    continue
+                is_match = False
+                if t.group_id and cand.group_id and t.group_id == cand.group_id:
+                    is_match = True
+                elif t.parent_table_ref and cand.table_ref == t.parent_table_ref:
+                    is_match = True
+                elif cand.parent_table_ref and cand.parent_table_ref == t.table_ref:
+                    is_match = True
+                elif t.next_table_ref and cand.table_ref == t.next_table_ref:
+                    is_match = True
+                elif cand.next_table_ref and cand.next_table_ref == t.table_ref:
+                    is_match = True
+
+                if is_match and len(linked_chosen) < self.max_tables:
+                    linked_chosen.append(cand)
+                    picked.add(cand.table_ref)
+
+        return linked_chosen

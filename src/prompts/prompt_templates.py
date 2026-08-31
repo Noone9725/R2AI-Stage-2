@@ -290,6 +290,54 @@ def format_period_hint(question: Any) -> str:
     return _PERIOD_HINTS.get(requested, "")
 
 
+def format_linked_tables_note(frames: dict[str, pd.DataFrame]) -> str:
+    """Xac dinh cac DataFrame thuoc cung 1 bang bi cat trang va tao ghi chu yeu cau ghep."""
+    groups: dict[str, list[str]] = {}
+    for var, df in frames.items():
+        if "group_id" in df.columns and not df.empty:
+            gid = str(df["group_id"].iloc[0])
+            if gid and gid not in ("None", "nan", ""):
+                groups.setdefault(gid, []).append(var)
+
+    notes: list[str] = []
+    for gid, vars_list in groups.items():
+        if len(vars_list) > 1:
+            vars_str = ", ".join(vars_list)
+            concat_code = f"df = pd.concat([{vars_str}], ignore_index=True)"
+            notes.append(
+                f"LƯU Ý ĐẶC BIỆT: Các bảng [{vars_str}] là các phần liên tiếp của cùng 1 bảng báo cáo bị ngắt trang.\n"
+                f"BẮT BUỘC bạn phải tự ghép chúng lại trước khi lọc dữ liệu: `{concat_code}`"
+            )
+
+    return "\n\n".join(notes)
+
+
+def format_unit_and_rounding_guidelines(question_text: str, asked_unit: str = "none") -> str:
+    """Gợi ý chuẩn hóa đơn vị và làm tròn trong query."""
+    q_low = question_text.lower()
+    hints = []
+
+    if asked_unit == "ty_dong" or "tỷ đồng" in q_low or "tỉ đồng" in q_low:
+        hints.append("YÊU CẦU ĐƠN VỊ: Câu hỏi hỏi TỶ ĐỒNG. Số liệu trong bảng là Đồng (VND) -> BẮT BUỘC chia `1e9` và `result = round(float(sub['value'].iloc[0]) / 1e9, 2)`.")
+    elif asked_unit == "trieu_dong" or "triệu đồng" in q_low:
+        hints.append("YÊU CẦU ĐƠN VỊ: Câu hỏi hỏi TRIỆU ĐỒNG. Nếu số liệu trong bảng là Đồng (VND, số >= 10^10 hoặc đơn vị vnd) -> chia `1e6` và `result = round(float(sub['value'].iloc[0]) / 1e6, 2)`. Nếu bảng ngân hàng đã là triệu đồng thì giữ nguyên `result = round(float(sub['value'].iloc[0]), 2)`.")
+    elif asked_unit == "nghin_dong" or "nghìn đồng" in q_low or "ngàn đồng" in q_low:
+        hints.append("YÊU CẦU ĐƠN VỊ: Câu hỏi hỏi NGHÌN ĐỒNG. Chia `1e3` và `result = round(float(sub['value'].iloc[0]) / 1e3, 2)`.")
+    elif "cổ phiếu" in q_low or "cổ tức" in q_low:
+        if "triệu cổ phiếu" in q_low:
+            hints.append("YÊU CẦU ĐƠN VỊ: Hỏi TRIỆU CỔ PHIẾU -> Chia `1e6` và `result = round(float(...) / 1e6, 2)`.")
+        elif "nghìn cổ phiếu" in q_low or "ngàn cổ phiếu" in q_low:
+            hints.append("YÊU CẦU ĐƠN VỊ: Hỏi NGHÌN CỔ PHIẾU -> Chia `1e3` và `result = round(float(...) / 1e3, 2)`.")
+        else:
+            hints.append("YÊU CẦU ĐƠN VỊ: Hỏi SỐ LƯỢNG CỔ PHIẾU -> Giữ nguyên số lượng thực: `result = float(...)` hoặc `round(float(...), 2)`.")
+    elif any(k in q_low for k in ("tỷ lệ", "tỷ trọng", "phần trăm", "%", "roe", "roa", "biên lợi nhuận", "tăng trưởng")):
+        hints.append("YÊU CẦU ĐƠN VỊ: Hỏi TỶ LỆ / % / SUẤT SINH LỜI -> Tính công thức nhân `100.0` và `result = round(float((val1 / val2) * 100.0), 2)`. Nếu trích xuất từ bảng có sẵn %, giữ nguyên.")
+    elif any(k in q_low for k in ("năm nào", "vào năm nào", "năm có")):
+        hints.append("YÊU CẦU ĐƠN VỊ: Hỏi NĂM -> Gán kết quả dạng số thực của năm: `result = float(max_year)` (ví dụ `2019.0`), tuyệt đối không chia đơn vị tiền.")
+
+    return "\n".join(hints)
+
+
 def format_candidates(tables: list[RetrievedTable]) -> str:
     return "\n\n".join(
         f"[{t.table_ref}] {t.title or '(không có tiêu đề)'}\n{t.card}" for t in tables

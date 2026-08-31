@@ -92,6 +92,10 @@ class CsvWriter:
             "columns": [str(c) for c in df.columns],
             "line_start": table.line_start,
             "line_end": table.line_end,
+            "is_continuation": table.is_continuation,
+            "group_id": table.group_id,
+            "parent_table_ref": table.parent_table_ref,
+            "next_table_ref": table.next_table_ref,
         })
         return csv_path
 

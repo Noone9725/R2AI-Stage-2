@@ -27,7 +27,7 @@ llm:
   max_model_len: 4096
 
 llm_local:
-  # Cấu hình MẶC ĐỊNH cho Local GPU RTX 2050 (4GB) / CPU
+  # Cấu hình MẶC ĐỊNH cho Local GPU / CPU
   model_id: Qwen/Qwen2.5-Coder-1.5B-Instruct
   backend: transformers
   max_tokens: 512

@@ -206,6 +206,151 @@ class AnswerPipeline:
             if int(q["id"]) in items_by_id
         ]
 
+    def run_from_retrieval(
+        self,
+        retrieval_path: str | Path,
+        *,
+        out_path: str | Path | None = None,
+        checkpoint_path: Path | str | None = None,
+        save_every: int = 5,
+        resume: bool = True,
+        limit: int | None = None,
+    ) -> list[SubmissionItem]:
+        """Giai doan 2 (Phase 2): Doc retrieval_results.json -> Sinh ma Pandas -> Thuc thi -> Submission."""
+        from ..schemas import RetrievalResult, RetrievedTable
+        from ..utils.io import read_json, write_json_atomic
+
+        r_file = Path(retrieval_path)
+        if not r_file.exists():
+            raise FileNotFoundError(f"Khong tim thay file retrieval trung gian: {r_file}. Hay chay Phase 1 truoc.")
+
+        raw_data = read_json(r_file)
+        if not isinstance(raw_data, list):
+            raise ValueError(f"File retrieval khong hop le: {r_file} (phai la list JSON)")
+
+        if limit is not None:
+            raw_data = raw_data[:limit]
+
+        ckpt_file = Path(checkpoint_path) if checkpoint_path else None
+        items_by_id: dict[int, SubmissionItem] = {}
+
+        # Resume tu checkpoint neu co
+        if ckpt_file and ckpt_file.exists() and resume:
+            try:
+                existing_data = read_json(ckpt_file)
+                if isinstance(existing_data, list):
+                    for row in existing_data:
+                        qid = int(row["id"])
+                        items_by_id[qid] = SubmissionItem.from_dict(row)
+                    log.info("Phase 2: Resume tu checkpoint %s: da co %d cau", ckpt_file, len(items_by_id))
+            except Exception as exc:
+                log.warning("Phase 2: Khong doc duoc checkpoint (%s) — chay tu dau", exc)
+
+        total = len(raw_data)
+        n_processed = 0
+        import time
+
+        def _sync_external_backup(source_file: Path) -> None:
+            import shutil
+            for parent_dir in (Path("/content/drive/MyDrive/backup"), Path("/kaggle/working/backup")):
+                if parent_dir.parent.exists():
+                    try:
+                        parent_dir.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(source_file, parent_dir / source_file.name)
+                        log.info("Da backup Phase 2 sang: %s", parent_dir / source_file.name)
+                    except Exception as e:
+                        log.debug("Auto backup: %s", e)
+
+        log.info("Bat dau Phase 2 (Generation & Execution): Xu ly %d cau hoi...", total)
+
+        for item_dict in raw_data:
+            qid = int(item_dict["id"])
+            if qid in items_by_id:
+                continue
+
+            q_text = str(item_dict.get("question", ""))
+            question = Question(
+                id=qid,
+                question=q_text,
+                tickers=item_dict.get("tickers", []),
+                years=item_dict.get("years", []),
+                metrics=item_dict.get("metrics", []),
+                asked_unit=item_dict.get("asked_unit", "none"),
+                requested_period=item_dict.get("requested_period", ""),
+                needs_derived=item_dict.get("needs_derived", False),
+            )
+
+            cands = []
+            for t in item_dict.get("candidate_tables", []):
+                cands.append(
+                    RetrievedTable(
+                        table_ref=t["table_ref"],
+                        doc_id=t["doc_id"],
+                        position=int(t["position"]),
+                        score=float(t.get("score", 0.0)),
+                        csv_path=t.get("csv_path"),
+                        title=t.get("title", ""),
+                        section=t.get("section"),
+                        is_continuation=bool(t.get("is_continuation", False)),
+                        group_id=t.get("group_id"),
+                        parent_table_ref=t.get("parent_table_ref"),
+                        next_table_ref=t.get("next_table_ref"),
+                    )
+                )
+            retrieval = RetrievalResult(question_id=qid, tables=cands)
+
+            t0 = time.perf_counter()
+            try:
+                frames, var_to_csv = self.generator.load_frames(retrieval, question=question)
+                if not frames:
+                    log.warning("  * [CANH BAO] Khong load duoc DataFrame cho Q%d!", qid)
+                    query = GeneratedQuery(pandas_query="", var_to_csv=var_to_csv, reasoning="No CSV loaded", attempt=0, raw_response="")
+                    sub_item = self.builder.build(question, retrieval, query, None)
+                else:
+                    query = self.generator.generate(
+                        question, retrieval, frames=frames, var_to_csv=var_to_csv
+                    )
+                    execution, query = self.executor.run(question.question, query, frames)
+                    sub_item = self.builder.build(question, retrieval, query, execution)
+            except Exception as exc:
+                log.exception("Q%d Phase 2 loi: %s", qid, exc)
+                sub_item = self.builder.build(
+                    question, retrieval, GeneratedQuery(pandas_query=""), None
+                )
+
+            elapsed = time.perf_counter() - t0
+            items_by_id[qid] = sub_item
+            n_processed += 1
+            has_query = bool(sub_item.pandas_query and sub_item.pandas_query.strip())
+            log.info(
+                "[Q%d/%d] Phase 2 xong trong %.2fs -> answer: %s | query: %s",
+                qid, total, elapsed, sub_item.answer,
+                "OK" if has_query else "EMPTY",
+            )
+
+            # Checkpoint
+            if ckpt_file and (n_processed % save_every == 0 or len(items_by_id) == total):
+                ordered = [
+                    items_by_id[int(q["id"])].to_dict()
+                    for q in raw_data
+                    if int(q["id"]) in items_by_id
+                ]
+                write_json_atomic(ordered, ckpt_file)
+                _sync_external_backup(ckpt_file)
+
+        ordered = [
+            items_by_id[int(q["id"])]
+            for q in raw_data
+            if int(q["id"]) in items_by_id
+        ]
+        if out_path:
+            out_file = Path(out_path)
+            write_json_atomic([it.to_dict() for it in ordered], out_file)
+            log.info("Phase 2 da ghi ket qua cuoi cung -> %s", out_file)
+            _sync_external_backup(out_file)
+
+        return ordered
+
     @staticmethod
     def _empty_retrieval(question_id: int) -> Any:
         from ..schemas import RetrievalResult

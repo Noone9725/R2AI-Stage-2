@@ -115,8 +115,8 @@ def test_page_marker_duoc_gan_vao_bang():
     assert extract_html_tables(REAL_TXT)[0].page == 8
 
 
-def test_position_dem_tu_1():
-    assert extract_html_tables(REAL_TXT)[0].position == 1
+def test_position_la_line_no_trong_raw_txt():
+    assert extract_html_tables(REAL_TXT)[0].position == 12
 
 
 def test_count_html_tables():
@@ -151,7 +151,7 @@ def test_context_before_khong_chua_markup():
 
 def test_table_ref_dung_dinh_dang_submission():
     table = TableDetector().detect(_doc(REAL_TXT))[0]
-    assert table.table_ref == "AAA_financial_statements_2020_consolidated|1"
+    assert table.table_ref == "AAA_financial_statements_2020_consolidated|12"
 
 
 def test_bang_ngan_hang_dung_ten_bao_cao_tinh_hinh_tai_chinh():
@@ -166,7 +166,7 @@ def test_bang_ngan_hang_dung_ten_bao_cao_tinh_hinh_tai_chinh():
     assert TableDetector().detect(_doc(text))[0].section == "balance_sheet"
 
 
-def test_stitch_fractured_tables_across_pages():
+def test_link_fractured_tables_across_pages():
     text = (
         "===== PAGE 8 =====\n"
         "<table><tr><td>Chỉ tiêu</td><td>Năm 2023</td><td>Năm 2022</td></tr>\n"
@@ -175,10 +175,12 @@ def test_stitch_fractured_tables_across_pages():
         "<table><tr><td>Giá vốn hàng bán</td><td>(60.000)</td><td>(50.000)</td></tr>\n"
         "<tr><td>Lợi nhuận gộp</td><td>40.000</td><td>40.000</td></tr></table>\n"
     )
-    tables = extract_html_tables(text, stitch=True)
-    assert len(tables) == 1
-    assert len(tables[0].rows) == 4
-    assert tables[0].rows[1][0] == "Doanh thu bán hàng"
-    assert tables[0].rows[2][0] == "Giá vốn hàng bán"
-    assert tables[0].position == 1
+    tables = extract_html_tables(text, link_tables=True)
+    assert len(tables) == 2
+    assert tables[0].position == 2
+    assert tables[1].position == 5
+    assert tables[0].group_id is not None
+    assert tables[0].group_id == tables[1].group_id
+    assert tables[1].is_continuation is True
+    assert tables[1].parent_position == 2
 
