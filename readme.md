@@ -4,7 +4,7 @@ Dự án này là giải pháp toàn diện cho **Stage 2** của cuộc thi **V
 1. **Truy hồi chính xác bảng số liệu mục tiêu** từ hàng trăm nghìn bảng BCTC phức tạp.
 2. **Sinh mã Pandas (Text-to-Pandas)** thông qua mô hình ngôn ngữ lớn (LLM).
 3. **Thực thi mã an toàn trong Sandbox AST** kèm vòng lặp tự sửa lỗi (**Self-Correction Loop**).
-4. **Chuẩn hóa đơn vị và đóng gói tự động** file `submission.zip` đạt 100% chuẩn quy định của Ban tổ chức.
+4. **Chuẩn hóa đơn vị và đóng gói tự động** file `submission.zip` đạt chuẩn quy định của Ban tổ chức.
 
 ---
 
@@ -83,6 +83,14 @@ cd R2AI-Stage-2
 Thư mục `data/` nặng (>100,000 file CSV) được loại trừ khỏi Git để tối ưu dung lượng repo. Bạn có 2 cách để nạp dữ liệu:
 * **Cách 1 (Nhanh nhất - Khuyên dùng):** Sử dụng file `data_backup.zip` đã được đóng gói sẵn. Chỉ cần giải nén file zip này vào thư mục `data/` của dự án.
 * **Cách 2 (Xây dựng từ đầu):** Chạy `python main.py fetch` $\rightarrow$ `python main.py corpus` $\rightarrow$ `python main.py index` để hệ thống tự tải BCTC gốc từ HuggingFace và bóc tách tự động.
+
+### Bạn có thể lấy dataset đã xử lý sẵn tại:
+  [https://www.kaggle.com/datasets/anhtu25/r2ai-s2-dataset](https://www.kaggle.com/datasets/anhtu25/r2ai-s2-dataset)
+  
+  **Lưu ý**: Dataset này có định dạng `zip.bin`: 
+    * Nếu muốn tải về máy cá nhân để chạy Local bạn cần thêm bước giải nén. 
+    * Nếu muốn chạy trên Colab bạn cần chuyển sang định dạng `zip`. (Nếu chạy trên `notebooks/pipeline_runner_colab.ipynb` đã tạo sẵn)
+    * Nếu muốn chạy trên Kaggle bạn có thể input dataset trực tiếp về kaggle dataset. (Nếu chạy trên `notebooks/pipeline_runner_kaggle.ipynb` đã tạo sẵn)
 
 ---
 
@@ -254,7 +262,7 @@ python main.py eval --pred outputs/predictions/final_results.json
 
 * Mở [notebooks/pipeline_runner_colab.ipynb](file:R2AI-Stage-2/notebooks/pipeline_runner_colab.ipynb) trên Google Colab.
 * Hoặc mở [notebooks/pipeline_runner_kaggle.ipynb](file:R2AI-Stage-2/notebooks/pipeline_runner_kaggle.ipynb) trên Kaggle Notebook.
-    Sau đó chạy các cell code cần thiết để tương tác trực quan và theo dõi tiến trình từng ô lệnh.
+  Sau đó chạy các cell code cần thiết để tương tác trực quan và theo dõi tiến trình từng ô lệnh.
 
 ---
 
@@ -265,14 +273,30 @@ Hệ thống đi kèm bộ kiểm thử tự động toàn diện kiểm tra t�
 pytest tests/ -q
 ```
 
-**Chi tiết các bộ test suite:**
-* `tests/test_html_table.py`: Kiểm thử trích xuất bảng HTML, sửa lỗi dính chữ/số OCR và thuật toán ghép bảng gãy qua trang (`TableStitcher`).
-* `tests/test_number_parser.py`: Kiểm thử chuyển đổi định dạng số tài chính Việt Nam (dấu chấm/phẩy, số âm ngoặc đơn, regex đơn vị tiền tệ triệu/tỷ).
-* `tests/test_hierarchical_prefix.py`: Kiểm thử thuật toán lan truyền tiền tố nhóm cha vào cột `item`.
-* `tests/test_report_type_filter.py`: Kiểm thử phân loại câu hỏi (BCTC mẹ vs hợp nhất) và bộ lọc cứng `report_type`.
-* `tests/test_selector_coverage.py`: Kiểm thử Multi-Section Coverage cho câu hỏi tính chỉ số phái sinh (ROE/ROA).
-* `tests/test_sandbox_repair.py`: Kiểm thử môi trường thực thi an toàn AST `PandasSandbox` và chẩn đoán tự sửa lỗi Self-Repair.
-* `tests/test_submission_schema.py`: Đảm bảo cấu trúc file JSON nộp bài luôn khớp 100% với yêu cầu của Ban tổ chức.
+**Chi tiết các bộ test suite (16 files / 312 tests):**
+* **Trích xuất Bảng & Xử lý OCR (Extraction & Ingestion):**
+  * `tests/test_html_table.py`: Kiểm thử trích xuất bảng HTML nội tuyến từ văn bản OCR thô và thuật toán sửa lỗi gộp số do `rowspan`/`colspan`.
+  * `tests/test_table_detector.py`: Kiểm thử nhận diện bảng văn bản thô qua các dialect (pipe `|`, tab `\t`, whitespace), định vị số dòng bắt đầu `position` và trích xuất ngữ cảnh/section BCTC.
+* **Chuẩn hóa Số liệu & Cấu trúc (Normalization):**
+  * `tests/test_number_parser.py`: Kiểm thử chuyển đổi định dạng số tài chính Việt Nam (dấu chấm/phẩy, số âm ngoặc đơn, regex phát hiện đơn vị tiền tệ triệu/tỷ).
+  * `tests/test_period.py`: Kiểm thử giải mã kỳ báo cáo, phân biệt số cuối kỳ (`CLOSING` 31/12) và quy tắc lùi năm cho số đầu kỳ (`OPENING` 01/01).
+  * `tests/test_row_identity.py`: Kiểm thử chống xung đột dữ liệu dòng (`row identity`) qua `item_code` cho dòng con lặp lại và `column_label` cho bảng trục ngang phân loại.
+  * `tests/test_hierarchical_prefix.py`: Kiểm thử thuật toán lan truyền tiền tố nhóm cha vào cột `item` phân cấp.
+  * `tests/test_answer_unit.py`: Kiểm thử nhận diện đơn vị hỏi trong câu tự nhiên (`AskedUnit`) và chuẩn hóa thang đo đáp số (`AnswerNormalizer`).
+* **Truy hồi & Phân tích Truy vấn (Retrieval & Query Analysis):**
+  * `tests/test_company_map.py`: Kiểm thử ánh xạ tên công ty/thương hiệu sang Ticker sàn chứng khoán, xử lý tiền tố chung và lọc bỏ các từ viết tắt tài chính gây nhiễu (ROE, CFO, TNDN...).
+  * `tests/test_report_type_filter.py`: Kiểm thử trích xuất và lọc phạm vi BCTC mẹ (`separate`) vs BCTC hợp nhất (`consolidated`).
+  * `tests/test_selector_coverage.py`: Kiểm thử bộ chọn bảng thích ứng (`TableSelector`) đảm bảo bao phủ đa phân mục (Multi-Section) và đa doanh nghiệp (Multi-Ticker).
+* **Thực thi & Tự sửa lỗi (Execution & Self-Repair):**
+  * `tests/test_sandbox_repair.py`: Kiểm thử môi trường thực thi an toàn AST `PandasSandbox`, chặn mã cấm, bắt lỗi runtime và module chẩn đoán gợi ý tự sửa lỗi Self-Repair.
+* **Pipeline & Toàn vẹn Dữ liệu (Pipeline & Data Integrity):**
+  * `tests/test_decoupled_pipeline.py`: Kiểm thử luồng 2 pha tách rời (Retrieval -> Generation), gợi ý ghép nối chuỗi bảng liên kết `pd.concat` và chỉ dẫn làm tròn/đơn vị trong prompt.
+  * `tests/test_corpus_integrity.py`: Kiểm thử tính toàn vẹn của artifact corpus/index, cơ chế `upsert` chống ghi đè làm mất manifest và kiểm tra tính nhất quán giữa CSV và chỉ mục.
+* **Quy chuẩn Nộp bài & Đánh giá (Submission & Evaluation):**
+  * `tests/test_submission_schema.py`: Kiểm định tính hợp lệ của file JSON nộp bài (7 trường bắt buộc, kiểu dữ liệu, định dạng `table_ref`, kiểm tra file CSV evidence).
+  * `tests/test_evaluation.py`: Kiểm thử hệ thống đo lường benchmark (Precision, Recall, DOCS/TABLES F2, MRR@5, Execution Accuracy) và phân loại nguyên nhân lỗi (`Failure` taxonomy).
+* **Cấu hình Kiểm thử (Test Configuration):**
+  * `tests/conftest.py`: Thiết lập môi trường Pytest, tự động nạp thư mục gốc vào `sys.path` để phục vụ import toàn cục.
 
 ---
 
@@ -317,34 +341,25 @@ Cấu trúc mỗi phần tử trong `submission.json`:
    * **Lý do:** Qwen2.5 hiện là dòng mô hình mã nguồn mở dưới 14B có khả năng suy luận logic, hiểu cấu trúc bảng biểu và sinh mã Python/Pandas mạnh và đáp ứng yêu cầu của cuộc thi. Model 14B thì bản lượng tử hóa 4-bit AWQ giúp mô hình 14B chạy được trên 16GB VRAM GPU T4 nhưng vẫn còn hạn chế, cần tùy chỉnh thêm nhiều thông số bổ sung để hoạt động tối ưu. Còn model 7B thì cũng cần phải lượng tử hóa 4-bit với bitsandbytes để chạy được với 16GB VRAM GPU T4 (bản thường 16-bit vẫn chiếm dụng tới ~14GB VRAM).
 2. **Backend Suy luận — Hugging Face Transformers & AutoAWQ**:
    * **Lựa chọn:** `transformers` với `autoawq` / `gptqmodel`.
-   * **Lý do:** Chạy đồng bộ trực tiếp trong tiến trình chính, tương thích trên cả Windows, Linux và Google Colab. Tránh được các lỗi xung đột CUDA context và deadlock IPC của các runtime multiprocessing trên GPU T4.
+   * **Lý do:** Chạy đồng bộ trực tiếp trong tiến trình chính, tương thích trên cả Windows, Linux và Google Colab/Kaggle. Tránh được các lỗi xung đột CUDA context và deadlock IPC của các runtime multiprocessing trên GPU T4.
 3. **Mô hình Nhúng Vector Đa ngữ — BAAI/bge-m3 & FAISS**:
    * **Lựa chọn:** `BAAI/bge-m3` kết hợp `FAISS (IndexFlatIP)`.
-   * **Lý do:** BGE-M3 hỗ trợ hơn 100 ngôn ngữ với khả năng biểu diễn ngữ nghĩa tiếng Việt tài chính sâu sắc, nhận diện mối quan hệ giữa từ ngữ câu hỏi và thẻ mô tả bảng (Table Card). FAISS cho phép tìm kiếm độ tương đồng Cosine (Inner Product sau chuẩn hóa) trên 119,000 vector chiều 1024 chỉ trong vài mili-giây.
+   * **Lý do:** BGE-M3 hỗ trợ hơn 100 ngôn ngữ với khả năng biểu diễn ngữ nghĩa tiếng Việt tài chính tốt, nhận diện mối quan hệ giữa từ ngữ câu hỏi và thẻ mô tả bảng (Table Card). FAISS cho phép tìm kiếm độ tương đồng Cosine (Inner Product sau chuẩn hóa) trên lượng lớn vector chiều 1024 chỉ trong vài mili-giây.
 4. **Hợp nhất Chỉ mục Lai — BM25Okapi + Reciprocal Rank Fusion (RRF)**:
    * **Lựa chọn:** `BM25Okapi` (từ khóa chính xác: mã ticker, năm, chỉ tiêu) + `Dense Vector` (ngữ nghĩa) $\rightarrow$ `RRF (k=60)`.
    * **Lý do:** BM25 bắt chính xác các từ khóa số và tên mã chứng khoán viết tắt; Dense vector bắt các từ đồng nghĩa tài chính. RRF hợp nhất hai bảng xếp hạng một cách phi tham số, đạt điểm **Recall F2 tối đa** mà không bị lệch trọng số.
 5. **Môi trường Thực thi An toàn Sandbox AST & Self-Repair Loop**:
    * **Lựa chọn:** `PandasSandbox` (kiểm tra cây cú pháp trừu tượng AST) + `SelfRepairExecutor`.
    * **Lý do:** Ngăn chặn tuyệt đối các lệnh nguy hiểm (file I/O, network, shell). Khi code Pandas gặp lỗi runtime (`KeyError`, `IndexError`), traceback và schema bảng được phản hồi ngược lại LLM để tự sửa lỗi (tối đa 3 lần), nâng cao tỷ lệ sinh câu trả lời thành công.
-6. **Bộ Chuẩn hóa Đơn vị Tài chính Tự động (Financial Unit Auto-Scaling)**:
-   * **Lý do:** Đề thi hỏi bằng nhiều đơn vị khác nhau (*tỷ đồng, triệu đồng, nghìn đồng, USD, %*). Module tự động phát hiện đơn vị trong câu hỏi và đơn vị gốc của bảng để áp dụng hệ số nhân chuẩn hóa ($10^9, 10^6, 10^3$) trước khi trả lời.
 
 ---
 
 ### 8.2. Tài liệu Tham khảo (References)
-
+ 
 * **Qwen2.5 Technical Report**: Yang, A., et al. (2024). *Qwen2.5 Technical Report*. [arXiv:2412.15115](https://arxiv.org/abs/2412.15115).
 * **BGE-M3 (Multilingual Embedding)**: Chen, J., et al. (2024). *BGE M3-Embedding: Multi-Lingual, Multi-Functionality, Multi-Granularity Text Embeddings Through Self-Knowledge Distillation*. [arXiv:2402.03216](https://arxiv.org/abs/2402.03216).
 * **AWQ: Activation-aware Weight Quantization**: Lin, J., et al. (2023). *AWQ: Activation-aware Weight Quantization for On-Device LLM Compression and Acceleration*. [arXiv:2306.00978](https://arxiv.org/abs/2306.00978).
 * **Reciprocal Rank Fusion (RRF)**: Cormack, G. V., Clarke, C. L., & Buettcher, S. (2009). *Reciprocal rank fusion outperformsres ranking methods*. In Proceedings of the 32nd international ACM SIGIR conference on Research and development in information retrieval (pp. 868-869).
 * **FAISS (Billion-scale Similarity Search)**: Johnson, J., Douze, M., & Jégou, H. (2019). *Billion-scale similarity search with GPUs*. IEEE Transactions on Big Data, 7(3), 535-547.
 * **BM25Okapi**: Robertson, S. E., & Zaragoza, H. (2009). *The Probabilistic Relevance Framework: BM25 and Beyond*. Foundations and Trends in Information Retrieval, 3(4), 333-389.
-
 ---
-
-## Bạn có thể lấy dataset đã xử lý sẵn tại:
-* Dataset dạng nén `.zip.bin`: 
-    [https://www.kaggle.com/datasets/anhtu25/s2-backup](https://www.kaggle.com/datasets/anhtu25/s2-backup)
-* Dataset thư mục đã giải nén sẵn: 
-    [https://www.kaggle.com/datasets/anhtu25/r2ai-s2-backup](https://www.kaggle.com/datasets/anhtu25/r2ai-s2-backup)

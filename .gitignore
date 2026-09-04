@@ -25,8 +25,9 @@ data/*
 # ── ket qua chay & logs ──────────────────────────────────────
 logs/*
 !logs/.gitkeep
-outputs/*
-!outputs/.gitkeep
+outputs/**
+!outputs/**/
+!outputs/**/.gitkeep
 
 # ── file he thong & tai lieu noi bo ─────────────────────────
 .DS_Store
