@@ -77,7 +77,7 @@ Dự án được thiết kế để hoạt động mượt mà trên cả 3 mô
 ### Cách Clone & Khôi phục Dữ liệu (Dành cho Repo không chứa data thô)
 Khi bạn hoặc người dùng khác clone repo từ GitHub:
 ```bash
-git clone https://github.com/Nostagi/R2AI-Stage-2.git
+git clone https://github.com/Noone9725/R2AI-Stage-2.git
 cd R2AI-Stage-2
 ```
 Thư mục `data/` nặng (>100,000 file CSV) được loại trừ khỏi Git để tối ưu dung lượng repo. Bạn có 2 cách để nạp dữ liệu:
