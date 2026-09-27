@@ -13,7 +13,7 @@ Dự án này là giải pháp toàn diện cho **Stage 2** của cuộc thi **V
 Hệ thống được thiết kế theo mô hình xử lý theo đợt (**Batch Pipeline**) chịu lỗi cao:
 
 ```
-[00. Raw BCTC .txt] ──► 01. Corpus Pipeline (Table Stitching ghép bảng gãy + Prefix phân cấp)
+[00. Raw BCTC .txt] ──► 01. Corpus Pipeline
                                   │
                                   ▼
 [02. Index Pipeline] ──► BM25 + Dense Vectors (BGE-M3) + Lọc BCTC Mẹ vs Hợp nhất
